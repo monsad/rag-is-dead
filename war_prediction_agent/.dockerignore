@@ -1,0 +1,104 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+*.whl
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+.hypothesis/
+*.cover
+
+# Documentation
+README.md
+docs/
+*.md
+LICENSE
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.override.yml
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Test files
+test/
+tests/
+test_*.py
+*_test.py
+
+# Example files
+example_*.py
+opensearch_examples.py
+
+# Database dumps
+*.db
+*.sqlite
+*.sqlite3
+dump.rdb
+
+# OpenSearch data
+opensearch-data/
+opensearch-data-*
+
+# Cache
+.cache/
+*.cache
+
+# Node modules (if any)
+node_modules/
+

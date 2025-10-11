@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>War Prediction Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 5px;
+        }
+
+        .status-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-degraded {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .dot-green {
+            background: #28a745;
+        }
+
+        .dot-yellow {
+            background: #ffc107;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .prediction-form {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        input[type="number"], select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .risk-score {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .risk-score-value {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .risk-low { color: #28a745; }
+        .risk-medium { color: #ffc107; }
+        .risk-high { color: #fd7e14; }
+        .risk-critical { color: #dc3545; }
+
+        .risk-badge {
+            display: inline-block;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-low {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-high {
+            background: #ffe5d0;
+            color: #8a4400;
+        }
+
+        .badge-critical {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .info-card h3 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .info-card p {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .reasoning {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #dc3545;
+        }
+
+        .regional-analyses {
+            margin-top: 30px;
+        }
+
+        .region-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .region-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .region-name {
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            padding: 20px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌍 War Prediction Agent</h1>
+            <p>AI-Powered Conflict Risk Assessment System</p>
+        </div>
+
+        <div class="status-card">
+            <h2 style="margin-bottom: 15px;">System Status</h2>
+            <div id="systemStatus">
+                <div class="status-indicator">
+                    <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                    <span>Checking status...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="prediction-form">
+            <h2 style="margin-bottom: 20px;">Run Prediction Analysis</h2>
+            <form id="predictionForm">
+                <div class="form-group">
+                    <label for="lookbackHours">Analysis Timeframe (hours)</label>
+                    <input type="number" id="lookbackHours" name="lookbackHours" value="24" min="1" max="168" required>
+                    <small style="color: #666; display: block; margin-top: 5px;">How many hours of data to analyze (1-168)</small>
+                </div>
+                <button type="submit" id="submitBtn">🔍 Analyze Risk</button>
+            </form>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <h3>Analyzing global intelligence data...</h3>
+            <p>This may take a few minutes</p>
+        </div>
+
+        <div id="results" class="results">
+            <!-- Results will be inserted here -->
+        </div>
+
+        <div class="footer">
+            <p>Built with LangGraph, FastAPI, and OpenAI</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">⚠️ For informational purposes only. Not for operational decision-making.</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Check system status on load
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('systemStatus');
+                const isHealthy = data.status === 'healthy';
+                const statusClass = isHealthy ? 'status-healthy' : 'status-degraded';
+                const dotClass = isHealthy ? 'dot-green' : 'dot-yellow';
+                
+                statusDiv.innerHTML = `
+                    <div class="status-indicator ${statusClass}">
+                        <div class="status-dot ${dotClass}"></div>
+                        <span>System Status: ${data.status.toUpperCase()}</span>
+                    </div>
+                    <div class="status-indicator ${data.redis === 'connected' ? 'status-healthy' : 'status-degraded'}">
+                        <div class="status-dot ${data.redis === 'connected' ? 'dot-green' : 'dot-yellow'}"></div>
+                        <span>Redis: ${data.redis}</span>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('systemStatus').innerHTML = `
+                    <div class="error">Failed to connect to API: ${error.message}</div>
+                `;
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const lookbackHours = document.getElementById('lookbackHours').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingDiv = document.getElementById('loading');
+            const resultsDiv = document.getElementById('results');
+            
+            // Show loading
+            submitBtn.disabled = true;
+            loadingDiv.style.display = 'block';
+            resultsDiv.classList.remove('show');
+            resultsDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE}/predict`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        lookback_hours: parseInt(lookbackHours),
+                        include_social_media: true,
+                        regions: null
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Prediction failed');
+                }
+                
+                const data = await response.json();
+                displayResults(data);
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h3>⚠️ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                resultsDiv.style.display = 'block';
+                resultsDiv.classList.add('show');
+            } finally {
+                loadingDiv.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            
+            const riskLevel = data.global_risk_level;
+            const riskScore = data.global_risk_score;
+            const riskClass = `risk-${riskLevel}`;
+            const badgeClass = `badge-${riskLevel}`;
+            
+            let regionalHtml = '';
+            if (data.regional_analyses && data.regional_analyses.length > 0) {
+                regionalHtml = `
+                    <div class="regional-analyses">
+                        <h2>Regional Analysis</h2>
+                        ${data.regional_analyses.map(region => `
+                            <div class="region-card">
+                                <div class="region-header">
+                                    <span class="region-name">${region.region}</span>
+                                    <span class="risk-badge badge-${region.risk_level}">
+                                        ${region.risk_level}
+                                    </span>
+                                </div>
+                                <p>Risk Score: <strong>${region.risk_score.toFixed(2)}</strong></p>
+                                <p>Data Points: ${region.data_points_analyzed}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            resultsDiv.innerHTML = `
+                <h2>📊 Prediction Results</h2>
+                
+                <div class="risk-score">
+                    <h3>Global Risk Assessment</h3>
+                    <div class="risk-score-value ${riskClass}">
+                        ${(riskScore * 100).toFixed(1)}%
+                    </div>
+                    <div class="risk-badge ${badgeClass}">
+                        ${riskLevel}
+                    </div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3>Confidence</h3>
+                        <p>${(data.confidence * 100).toFixed(1)}%</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Sources Analyzed</h3>
+                        <p>${data.sources_analyzed}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Key Events</h3>
+                        <p>${data.key_events ? data.key_events.length : 0}</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Timestamp</h3>
+                        <p>${new Date(data.timestamp).toLocaleTimeString()}</p>
+                    </div>
+                </div>
+                
+                ${regionalHtml}
+                
+                <div class="reasoning">
+                    <h3>Analysis Reasoning</h3>
+                    <p>${data.reasoning}</p>
+                </div>
+            `;
+            
+            resultsDiv.style.display = 'block';
+            resultsDiv.classList.add('show');
+            
+            // Scroll to results
+            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Check status on page load
+        checkStatus();
+        
+        // Refresh status every 30 seconds
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>
+
