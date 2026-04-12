@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo: Naive RAG vs Intelligent Search</title>
+<style>
+:root {
+  --bg: #f7f9fb; --bg2: #eef2f7; --accent: #288cbb;
+  --accent2: #1a6e96; --accent3: #0ea871; --red: #e53e3e;
+  --text: #0f0f0f; --dim: #64748b; --border: rgba(40,140,187,.18);
+  --card: rgba(255,255,255,.97);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* grid bg */
+body::before { content:''; position:fixed; inset:0; background-image:
+  linear-gradient(rgba(40,140,187,.07) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(40,140,187,.07) 1px,transparent 1px);
+  background-size:48px 48px; z-index:0; pointer-events:none; }
+
+.wrap { position:relative; z-index:1; max-width:1400px; margin:0 auto; padding:40px 32px; }
+
+/* HEADER */
+header { text-align:center; margin-bottom:48px; }
+header .kicker { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--accent); margin-bottom:12px; }
+header h1 { font-size:clamp(28px,4vw,52px); font-weight:800;
+  background:linear-gradient(135deg,#0f0f0f,var(--accent),#74e2c5);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  line-height:1.15; }
+header p { font-size:16px; color:var(--dim); margin-top:12px; }
+
+/* DOC SECTION */
+.doc-section { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:28px; margin-bottom:28px; box-shadow:0 2px 16px rgba(40,140,187,.08); }
+.doc-section h2 { font-size:16px; color:var(--accent); text-transform:uppercase; letter-spacing:2px; margin-bottom:16px; }
+.doc-content { background:rgba(40,140,187,.04); border:1px solid rgba(40,140,187,.12); border-radius:10px; padding:20px; font-size:13px; color:var(--dim); line-height:1.8; max-height:180px; overflow-y:auto; }
+
+/* QUERY BAR */
+.query-bar { display:flex; gap:12px; margin-bottom:32px; }
+.query-bar input {
+  flex:1; background:#fff; border:1px solid var(--border);
+  border-radius:10px; padding:14px 20px; color:var(--text); font-size:15px;
+  outline:none; transition:border-color .2s;
+  box-shadow:0 2px 8px rgba(40,140,187,.07);
+}
+.query-bar input:focus { border-color:var(--accent); }
+.query-bar button {
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; border-radius:10px; padding:14px 28px; color:#fff;
+  font-size:15px; font-weight:700; cursor:pointer; transition:opacity .2s, transform .1s;
+  white-space:nowrap;
+}
+.query-bar button:hover { opacity:.85; transform:scale(1.02); }
+
+/* PRESET QUESTIONS */
+.presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:28px; }
+.preset-btn {
+  background:#fff; border:1px solid var(--border);
+  border-radius:20px; padding:6px 16px; font-size:13px; color:var(--dim);
+  cursor:pointer; transition:all .2s;
+  box-shadow:0 1px 4px rgba(40,140,187,.07);
+}
+.preset-btn:hover { background:rgba(40,140,187,.08); color:var(--accent); border-color:var(--accent); }
+
+/* TWO COLUMNS */
+.columns { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+
+.col-header {
+  display:flex; align-items:center; gap:10px; padding:16px 20px;
+  border-radius:12px 12px 0 0; font-weight:700; font-size:15px;
+}
+.col-header.bad { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); color:#f87171; }
+.col-header.good { background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3); color:var(--accent3); }
+
+.col-body {
+  border-radius:0 0 12px 12px; overflow:hidden;
+  border:1px solid; border-top:none; min-height:500px;
+  box-shadow:0 4px 16px rgba(0,0,0,.06);
+}
+.col-body.bad  { border-color:rgba(229,62,62,.2); background:#fff; }
+.col-body.good { border-color:rgba(14,168,113,.2); background:#fff; }
+
+/* STEPS */
+.step { padding:16px 20px; border-bottom:1px solid rgba(0,0,0,.06); }
+.step-label { font-size:10px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
+.bad  .step-label { color:rgba(248,113,113,.7); }
+.good .step-label { color:rgba(16,185,129,.7); }
+.step-content { font-size:13px; color:var(--dim); line-height:1.7; }
+
+/* CHUNKS */
+.chunks { display:flex; flex-direction:column; gap:6px; }
+.chunk {
+  background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2);
+  border-radius:6px; padding:8px 12px; font-size:12px; color:#fca5a5;
+  font-family:monospace; position:relative; overflow:hidden;
+}
+.chunk .chunk-label { font-size:10px; color:rgba(239,68,68,.6); margin-bottom:4px; text-transform:uppercase; letter-spacing:1px; }
+.chunk .chunk-text { color:var(--dim); }
+.chunk-bad { text-decoration:line-through; opacity:.5; }
+
+/* TREE */
+.tree { font-family:monospace; font-size:13px; line-height:1.9; }
+.tree-node { cursor:default; transition:color .15s; }
+.tree-node:hover { color:var(--accent); }
+.tree-node.selected { color:var(--accent3); font-weight:700; }
+.tree-node.dim-node { color:rgba(148,163,184,.3); }
+
+/* VECTOR SEARCH */
+.vectors { display:flex; flex-direction:column; gap:6px; }
+.vector-item {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; border-radius:6px;
+  background:rgba(239,68,68,.06); border:1px solid rgba(239,68,68,.15);
+  font-size:12px;
+}
+.vector-score { font-size:11px; font-weight:700; min-width:36px; }
+.score-high { color:var(--accent3); }
+.score-mid  { color:var(--accent4, #f59e0b); }
+.score-low  { color:var(--red); }
+.vector-text { color:var(--dim); font-family:monospace; }
+
+/* ANSWER BOX */
+.answer-box {
+  margin:16px; padding:16px; border-radius:10px;
+  font-size:14px; line-height:1.8;
+}
+.answer-box.bad-answer {
+  background:rgba(239,68,68,.06); border:1px solid rgba(239,68,68,.2);
+  color:#fca5a5;
+}
+.answer-box.good-answer {
+  background:rgba(16,185,129,.06); border:1px solid rgba(16,185,129,.2);
+  color:#6ee7b7;
+}
+.answer-box .source-tag {
+  display:inline-block; background:rgba(79,142,247,.15); color:var(--accent);
+  border-radius:4px; padding:1px 6px; font-size:11px; font-family:monospace;
+}
+
+/* THINKING ANIMATION */
+.thinking { display:flex; gap:6px; align-items:center; padding:16px 20px; }
+.thinking span { font-size:13px; color:var(--dim); }
+.dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:bounce .8s infinite; }
+.thinking { background:#fff; }
+.dot:nth-child(2) { animation-delay:.15s; }
+.dot:nth-child(3) { animation-delay:.30s; }
+@keyframes bounce { 0%,80%,100%{transform:scale(1)} 40%{transform:scale(1.4)} }
+
+/* VERDICT */
+.verdict { margin-top:28px; display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.verdict-card {
+  border-radius:12px; padding:20px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.verdict-card.bad-v  { background:#fff; border:1px solid rgba(229,62,62,.25); box-shadow:0 2px 12px rgba(229,62,62,.08); }
+.verdict-card.good-v { background:#fff; border:1px solid rgba(14,168,113,.25); box-shadow:0 2px 12px rgba(14,168,113,.08); }
+.verdict-card h3 { font-size:14px; font-weight:700; }
+.verdict-card.bad-v h3  { color:#f87171; }
+.verdict-card.good-v h3 { color:var(--accent3); }
+.verdict-card ul { list-style:none; display:flex; flex-direction:column; gap:4px; }
+.verdict-card ul li { font-size:13px; color:var(--dim); }
+.verdict-card.bad-v  ul li::before { content:"✗ "; color:var(--red); }
+.verdict-card.good-v ul li::before { content:"✓ "; color:var(--accent3); }
+
+/* PROGRESS BAR */
+.prog-bar { height:3px; border-radius:2px; margin-bottom:4px; transition:width 1s ease; }
+.prog-bar.red  { background:var(--red); }
+.prog-bar.green { background:var(--accent3); }
+
+/* PLACEHOLDER */
+.placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:300px; color:var(--dim); gap:12px; font-size:14px; background:#fff; }
+.placeholder .icon { font-size:48px; opacity:.25; }
+
+/* HIGHLIGHT */
+.hl-yellow { background:rgba(245,158,11,.15); color:#fcd34d; border-radius:3px; padding:0 3px; }
+.hl-green  { background:rgba(16,185,129,.15); color:#6ee7b7; border-radius:3px; padding:0 3px; }
+.hl-red    { background:rgba(239,68,68,.15); color:#fca5a5; border-radius:3px; padding:0 3px; }
+
+/* LEGEND */
+.legend { display:flex; gap:24px; justify-content:center; margin-bottom:20px; flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--dim); }
+.legend-dot { width:10px; height:10px; border-radius:50%; }
+
+/* FOOTER */
+footer { text-align:center; margin-top:48px; padding-top:24px; border-top:1px solid var(--border);
+  font-size:13px; color:var(--dim); }
+footer strong { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Live Demo · Softkraft</div>
+    <h1>Naive RAG vs Intelligent Search</h1>
+    <p>Zobacz na żywo dlaczego naiwny chunking przegrywa z inteligentną reprezentacją wiedzy</p>
+  </header>
+
+  <!-- DOKUMENT ŹRÓDŁOWY -->
+  <div class="doc-section">
+    <h2>Dokument źródłowy</h2>
+    <div class="doc-content" id="sourceDoc">
+<strong>Raport Finansowy Q3 2024 — Acme Corp</strong>
+
+<strong>1. Przychody</strong>
+Łączne przychody w Q3 2024 wyniosły 47,3 mln PLN, co stanowi wzrost o 23% rok do roku.
+Segment SaaS odpowiada za 31,2 mln PLN (66% przychodów), a segment Enterprise za 16,1 mln PLN (34%).
+Marża brutto segmentu SaaS wynosi 78%, podczas gdy marża Enterprise wynosi 61%.
+
+<strong>2. Koszty operacyjne</strong>
+Całkowite koszty operacyjne wyniosły 38,9 mln PLN.
+Największą pozycją były koszty R&D: 14,2 mln PLN (37% kosztów).
+Koszty sprzedaży i marketingu: 11,7 mln PLN (30%).
+Koszty G&A: 8,4 mln PLN (22%).
+Amortyzacja: 4,6 mln PLN (11%).
+
+<strong>3. EBITDA i wynik netto</strong>
+EBITDA Q3 2024: 13,0 mln PLN (marża 27,5%).
+EBIT: 8,4 mln PLN (marża 17,8%).
+Wynik netto: 6,2 mln PLN (marża netto 13,1%).
+Wzrost EBITDA vs Q3 2023: +34%.
+
+<strong>4. Przepływy pieniężne</strong>
+Cash flow operacyjny: 11,3 mln PLN.
+Capex: 2,1 mln PLN.
+Free cash flow: 9,2 mln PLN.
+Gotówka na koniec okresu: 28,7 mln PLN.
+
+<strong>5. Klienci i KPIs</strong>
+Liczba klientów SaaS: 1 247 (wzrost o 18% r/r).
+ARR: 124,8 mln PLN.
+Churn: 2,3% miesięcznie.
+NPS: 67.
+CAC: 12 400 PLN. LTV: 86 000 PLN. LTV/CAC: 6,9x.
+    </div>
+  </div>
+
+  <!-- QUERY -->
+  <div class="presets">
+    <span style="font-size:13px; color:var(--dim); margin-right:4px;">Przykładowe pytania:</span>
+    <button class="preset-btn" onclick="setQ('Jaka była marża EBITDA w Q3 2024?')">Marża EBITDA</button>
+    <button class="preset-btn" onclick="setQ('Ile wynosi LTV/CAC i co to oznacza?')">LTV/CAC</button>
+    <button class="preset-btn" onclick="setQ('Jakie są koszty R&D i jaki jest ich udział?')">Koszty R&D</button>
+    <button class="preset-btn" onclick="setQ('Porównaj marże segmentów SaaS i Enterprise')">Marże segmentów</button>
+    <button class="preset-btn" onclick="setQ('Jaki jest free cash flow?')">Free cash flow</button>
+  </div>
+
+  <div class="query-bar">
+    <input type="text" id="queryInput" placeholder="Zadaj pytanie o raport..." value="Jaka była marża EBITDA w Q3 2024?" />
+    <button onclick="runDemo()">▶ Uruchom demo</button>
+  </div>
+
+  <!-- COLUMNS -->
+  <div class="columns">
+    <!-- NAIVE RAG -->
+    <div>
+      <div class="col-header bad">Naiwny RAG (Chunking + Vector DB)</div>
+      <div class="col-body bad" id="badCol">
+        <div class="placeholder"><span>Kliknij "Uruchom demo"</span></div>
+      </div>
+    </div>
+    <!-- INTELLIGENT -->
+    <div>
+      <div class="col-header good">Intelligent Search (Tree + Context)</div>
+      <div class="col-body good" id="goodCol">
+        <div class="placeholder"><span>Kliknij "Uruchom demo"</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERDICT -->
+  <div class="verdict" id="verdictSection" style="display:none;">
+    <div class="verdict-card bad-v">
+      <h3>Naiwny RAG — problemy</h3>
+      <ul id="badVerdict"></ul>
+    </div>
+    <div class="verdict-card good-v">
+      <h3>Intelligent Search — zalety</h3>
+      <ul id="goodVerdict"></ul>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>Softkraft</strong> · Demo: Fundamentals of Intelligent Search and Answer Generation
+</footer>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────
+const DOC_SECTIONS = {
+  "1. Przychody": {
+    text: "Łączne przychody w Q3 2024 wyniosły 47,3 mln PLN, wzrost o 23% r/r. SaaS: 31,2 mln PLN (66%), Enterprise: 16,1 mln PLN (34%). Marża brutto SaaS: 78%, Enterprise: 61%.",
+    keywords: ["przychody","przychód","marża","saas","enterprise","wzrost","66%","78%","61%"]
+  },
+  "2. Koszty operacyjne": {
+    text: "Całkowite koszty operacyjne: 38,9 mln PLN. R&D: 14,2 mln PLN (37%). Sprzedaż i marketing: 11,7 mln PLN (30%). G&A: 8,4 mln PLN (22%). Amortyzacja: 4,6 mln PLN (11%).",
+    keywords: ["koszty","r&d","marketing","amortyzacja","g&a","operacyjne"]
+  },
+  "3. EBITDA i wynik netto": {
+    text: "EBITDA Q3 2024: 13,0 mln PLN (marża 27,5%). EBIT: 8,4 mln PLN (17,8%). Wynik netto: 6,2 mln PLN (13,1%). Wzrost EBITDA vs Q3 2023: +34%.",
+    keywords: ["ebitda","ebit","wynik","netto","marża","27","34%","13%"]
+  },
+  "4. Przepływy pieniężne": {
+    text: "Cash flow operacyjny: 11,3 mln PLN. Capex: 2,1 mln PLN. Free cash flow: 9,2 mln PLN. Gotówka na koniec: 28,7 mln PLN.",
+    keywords: ["cash","flow","capex","gotówka","przepływy","free"]
+  },
+  "5. Klienci i KPIs": {
+    text: "Klienci SaaS: 1 247 (+18% r/r). ARR: 124,8 mln PLN. Churn: 2,3%/mies. NPS: 67. CAC: 12 400 PLN. LTV: 86 000 PLN. LTV/CAC: 6,9x.",
+    keywords: ["klienci","arr","churn","nps","cac","ltv","kpi","saas"]
+  }
+};
+
+const CHUNKS = [
+  { text: "...wyniosły 47,3 mln PLN, co stanowi wzrost o 23% rok do roku. Segment SaaS odpowiada za 31,2 mln PLN (66%...", score: 0.51, note: "fragment przychody — brakuje kontekstu marż" },
+  { text: "...marża 27,5%). EBIT: 8,4 mln PLN (marża 17,8%). Wynik netto: 6,2 mln PLN (marża netto 13,1%). Wzrost EBI...", score: 0.73, note: "fragment EBITDA — bez nagłówka sekcji" },
+  { text: "...amortyzacja: 4,6 mln PLN (11%). EBITDA Q3 2024: 13,0 mln PLN (marża 27,5%). EBIT: 8,4...", score: 0.68, note: "fragment z granicy 2 sekcji — sens zaburzony" },
+  { text: "...Cash flow operacyjny: 11,3 mln PLN. Capex: 2,1 mln PLN. Free cash flow: 9,2 mln PLN...", score: 0.29, note: "niska trafność semantyczna" },
+  { text: "...Klienci SaaS: 1 247 (wzrost o 18% r/r). ARR: 124,8 mln PLN. Churn: 2,3% miesięcznie...", score: 0.21, note: "niska trafność semantyczna" },
+];
+
+const QUERIES = {
+  "marża ebitda": {
+    sections: ["3. EBITDA i wynik netto"],
+    badAnswer: "Na podstawie znalezionych fragmentów: marża wynosi 17,8%. EBITDA to 13,0 mln PLN. Wzrost wyniósł 34%... (fragment urwany przy granicy chunka — model nie widzi pełnego kontekstu sekcji)",
+    goodAnswer: "Marża EBITDA w Q3 2024 wyniosła <strong>27,5%</strong> (EBITDA: 13,0 mln PLN przy przychodach 47,3 mln PLN). Dla porównania, marża EBIT wyniosła 17,8%, a marża netto 13,1%. Wzrost EBITDA rok do roku: <strong>+34%</strong>.",
+    goodSource: "Sekcja 3. EBITDA i wynik netto",
+    badProblem: "Model wybrał chunk z granicy sekcji 2/3 — odpowiedź myli EBIT z EBITDA",
+    goodNote: "Model nawigował do sekcji '3. EBITDA i wynik netto' — pełny kontekst, precyzyjna odpowiedź"
+  },
+  "ltv/cac": {
+    sections: ["5. Klienci i KPIs"],
+    badAnswer: "Z dostępnych fragmentów: LTV wynosi 86 000 PLN, CAC 12 400 PLN... (chunk zawiera też dane o przychodach z innej sekcji — model miesza kontekst)",
+    goodAnswer: "LTV/CAC wynosi <strong>6,9x</strong>. Oznacza to, że każdy pozyskany klient generuje 6,9-krotnie wyższy przychód niż koszt jego pozyskania. CAC: 12 400 PLN, LTV: 86 000 PLN. To zdrowy wskaźnik — benchmark SaaS to minimum 3x.",
+    goodSource: "Sekcja 5. Klienci i KPIs",
+    badProblem: "Chunk semantycznie podobny to ten z przychodami — model mieszał dane z różnych sekcji",
+    goodNote: "Model precyzyjnie nawigował do sekcji KPIs i odczytał wszystkie powiązane wartości"
+  },
+  "r&d": {
+    sections: ["2. Koszty operacyjne"],
+    badAnswer: "Koszty R&D to 14,2 mln PLN... (chunk urwany — brakuje informacji o udziale procentowym i porównaniu z innymi kosztami)",
+    goodAnswer: "Koszty R&D wyniosły <strong>14,2 mln PLN</strong>, co stanowi <strong>37%</strong> całkowitych kosztów operacyjnych (38,9 mln PLN). To największa pozycja kosztowa — więcej niż sprzedaż i marketing łącznie (11,7 mln PLN, 30%).",
+    goodSource: "Sekcja 2. Koszty operacyjne",
+    badProblem: "Fragment z EBITDA miał wyższy score semantyczny niż koszty — model użył złego chunku",
+    goodNote: "Drzewo wskazało bezpośrednio sekcję kosztów. Pełna tabela kosztów w kontekście."
+  },
+  "marże segmentów": {
+    sections: ["1. Przychody"],
+    badAnswer: "Segment SaaS odpowiada za 31,2 mln PLN... marża brutto SaaS wynosi 78%... (chunk urwany przed danymi Enterprise — brakuje porównania)",
+    goodAnswer: "Marża brutto <strong>SaaS: 78%</strong> (przychód 31,2 mln PLN, 66% całości). Marża brutto <strong>Enterprise: 61%</strong> (przychód 16,1 mln PLN, 34% całości). Różnica marży: 17pp na korzyść SaaS — wskazuje na wyższy potencjał skalowania segmentu SaaS.",
+    goodSource: "Sekcja 1. Przychody",
+    badProblem: "Chunking podzielił dane SaaS i Enterprise między dwa oddzielne kawałki — model widział tylko część",
+    goodNote: "Cała sekcja przychodów jako jeden węzeł — model widzi pełne porównanie segmentów"
+  },
+  "free cash flow": {
+    sections: ["4. Przepływy pieniężne"],
+    badAnswer: "Cash flow operacyjny: 11,3 mln PLN... (fragment z Q3 pojawił się w chungu razem z danymi R&D — model mylił sekcje)",
+    goodAnswer: "Free cash flow w Q3 2024: <strong>9,2 mln PLN</strong>. Wyliczenie: cash flow operacyjny (11,3 mln PLN) minus Capex (2,1 mln PLN). Gotówka na koniec okresu: 28,7 mln PLN. FCF margin: ~19,5%.",
+    goodSource: "Sekcja 4. Przepływy pieniężne",
+    badProblem: "Wysoki semantic score dostał chunk z EBITDA — similar financial terminology = wrong chunk",
+    goodNote: "Tree nawigował bezpośrednio do sekcji Cash Flow — zero pomyłek kontekstowych"
+  }
+};
+
+function setQ(q) {
+  document.getElementById('queryInput').value = q;
+}
+
+function getQueryKey(q) {
+  q = q.toLowerCase();
+  if (q.includes('ebitda') || q.includes('marż')) return 'marża ebitda';
+  if (q.includes('ltv') || q.includes('cac')) return 'ltv/cac';
+  if (q.includes('r&d') || q.includes('r&d') || q.includes('badaw')) return 'r&d';
+  if (q.includes('segment') || q.includes('saas') || q.includes('enterprise')) return 'marże segmentów';
+  if (q.includes('cash') || q.includes('flow') || q.includes('przepływ')) return 'free cash flow';
+  return 'marża ebitda';
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function thinking(label) {
+  return `<div class="thinking">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <span>${label}</span>
+  </div>`;
+}
+
+async function runDemo() {
+  const query = document.getElementById('queryInput').value.trim();
+  if (!query) return;
+  const key = getQueryKey(query);
+  const data = QUERIES[key] || QUERIES['marża ebitda'];
+
+  document.getElementById('verdictSection').style.display = 'none';
+  document.getElementById('badCol').innerHTML = thinking('Chunking dokumentu...');
+  document.getElementById('goodCol').innerHTML = thinking('Budowanie drzewa dokumentu...');
+
+  await delay(800);
+
+  // ─── BAD COLUMN ─────────────────────────────────────────────────
+  let badHTML = '';
+
+  // Step 1: chunking
+  badHTML += `<div class="step">
+    <div class="step-label">Krok 1 — Chunking (800 tokenów)</div>
+    <div class="step-content">
+      <div class="chunks">
+        ${CHUNKS.map((c,i) => `
+          <div class="chunk">
+            <div class="chunk-label">Chunk #${i+1} · ${800 - Math.floor(Math.random()*200)} tokenów</div>
+            <div class="chunk-text">${c.text}</div>
+          </div>
+        `).join('')}
+      </div>
+      <p style="margin-top:10px; font-size:11px; color:rgba(239,68,68,.6);">
+        Dokument rozerwany na ${CHUNKS.length} fragmentów — granice sekcji ignorowane
+      </p>
+    </div>
+  </div>`;
+
+  document.getElementById('badCol').innerHTML = badHTML + thinking('Wyszukiwanie wektorowe...');
+  await delay(1000);
+
+  // Step 2: vector search
+  badHTML += `<div class="step">
+    <div class="step-label">Krok 2 — Semantic Search (cosine similarity)</div>
+    <div class="step-content">
+      <div class="vectors">
+        ${CHUNKS.map((c,i) => `
+          <div class="vector-item">
+            <span class="vector-score ${c.score > 0.6 ? 'score-high' : c.score > 0.4 ? 'score-mid' : 'score-low'}">
+              ${c.score.toFixed(2)}
+            </span>
+            <span class="vector-text">${c.text.slice(0,60)}...</span>
+          </div>
+        `).join('')}
+      </div>
+      <p style="margin-top:10px; font-size:11px; color:rgba(239,68,68,.6);">
+        Top-3 chunki przekazane do modelu — ${data.badProblem}
+      </p>
+    </div>
+  </div>`;
+
+  document.getElementById('badCol').innerHTML = badHTML + thinking('Generowanie odpowiedzi...');
+  await delay(1200);
+
+  // Step 3: bad answer
+  badHTML += `<div class="step">
+    <div class="step-label">Krok 3 — Odpowiedź modelu</div>
+  </div>
+  <div class="answer-box bad-answer">
+    <p>${data.badAnswer}</p>
+    <p style="margin-top:12px; font-size:11px; color:rgba(239,68,68,.5);">
+      Brak proweniencji · Możliwa halucynacja · Nie wiadomo skąd ta informacja
+    </p>
+  </div>`;
+
+  document.getElementById('badCol').innerHTML = badHTML;
+
+  // ─── GOOD COLUMN ────────────────────────────────────────────────
+  let goodHTML = '';
+
+  // Step 1: tree
+  const sectionNames = Object.keys(DOC_SECTIONS);
+  const targetSections = data.sections;
+
+  goodHTML += `<div class="step">
+    <div class="step-label">Krok 1 — Budowanie hierarchii dokumentu</div>
+    <div class="step-content">
+      <div class="tree">
+        Raport Finansowy Q3 2024 — Acme Corp<br>
+        ${sectionNames.map(s => {
+          const isTarget = targetSections.includes(s);
+          return `&nbsp;&nbsp;${isTarget ? '▶' : '▷'} <span class="tree-node ${isTarget ? 'selected' : 'dim-node'}">${s}</span>`;
+        }).join('<br>')}
+      </div>
+      <p style="margin-top:10px; font-size:11px; color:rgba(16,185,129,.6);">
+        ✓ Struktura dokumentu zachowana · Sekcje jako węzły drzewa
+      </p>
+    </div>
+  </div>`;
+
+  document.getElementById('goodCol').innerHTML = goodHTML + thinking('Nawigacja po drzewie...');
+  await delay(900);
+
+  // Step 2: navigation
+  goodHTML += `<div class="step">
+    <div class="step-label">Krok 2 — Reasoning-based Navigation</div>
+    <div class="step-content" style="font-size:13px; line-height:1.8;">
+      <p style="color:var(--dim);">Model analizuje pytanie: <span class="hl-yellow">"${query}"</span></p>
+      <p style="margin-top:8px;">→ Identyfikuje temat: <span class="hl-green">${data.sections[0]}</span></p>
+      <p>→ Pomija nieistotne sekcje: <span class="hl-red">${sectionNames.filter(s => !data.sections.includes(s)).join(' · ')}</span></p>
+      <p>→ Schodzi do węzła: <span class="hl-green">${data.sections[0]}</span></p>
+      <p style="margin-top:8px; font-size:11px; color:rgba(16,185,129,.6);">
+        ✓ Tylko trafna sekcja w kontekście — zero szumu
+      </p>
+    </div>
+  </div>`;
+
+  document.getElementById('goodCol').innerHTML = goodHTML + thinking('Generowanie odpowiedzi...');
+  await delay(1100);
+
+  // Step 3: good answer
+  const targetSection = DOC_SECTIONS[data.sections[0]];
+  goodHTML += `<div class="step">
+    <div class="step-label">Krok 3 — Kontekst przekazany do modelu</div>
+    <div class="step-content" style="background:rgba(16,185,129,.05); border-radius:6px; padding:10px; font-size:12px; color:var(--dim); font-family:monospace;">
+      [SEKCJA: ${data.sections[0]}]<br>${targetSection.text}
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-label">Krok 4 — Odpowiedź modelu</div>
+  </div>
+  <div class="answer-box good-answer">
+    <p>${data.goodAnswer}</p>
+    <p style="margin-top:12px; font-size:12px; color:rgba(16,185,129,.6);">
+      ✓ Źródło: <span class="source-tag">${data.goodSource}</span> · Pełny kontekst · Audytowalna odpowiedź
+    </p>
+    <p style="margin-top:4px; font-size:11px; color:rgba(16,185,129,.5);">
+      ${data.goodNote}
+    </p>
+  </div>`;
+
+  document.getElementById('goodCol').innerHTML = goodHTML;
+
+  // ─── VERDICT ────────────────────────────────────────────────────
+  await delay(300);
+  document.getElementById('badVerdict').innerHTML = `
+    <li>Chunking rozerwał granice sekcji</li>
+    <li>Semantic score ≠ logical relevance</li>
+    <li>Brak proweniencji — nie wiadomo skąd dane</li>
+    <li>Możliwa halucynacja lub mieszanie sekcji</li>
+    <li>Re-indexing przy każdej zmianie dokumentu</li>
+  `;
+  document.getElementById('goodVerdict').innerHTML = `
+    <li>Pełna sekcja jako kontekst — zero rozerwania</li>
+    <li>Model nawiguje jak ekspert (reasoning)</li>
+    <li>Proweniencja: dokładna sekcja, strona, węzeł</li>
+    <li>Precyzyjna odpowiedź z porównaniem</li>
+    <li>Brak re-indexingu — drzewo na żywo</li>
+  `;
+  document.getElementById('verdictSection').style.display = 'grid';
+  document.getElementById('verdictSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Run on Enter
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('queryInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runDemo();
+  });
+});
+</script>
+</body>
+</html>
