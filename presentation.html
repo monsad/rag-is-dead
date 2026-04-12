@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fundamentals of Intelligent Search and Answer Generation</title>
+<style>
+  :root {
+    --bg: #f7f9fb;
+    --bg2: #eef2f7;
+    --accent: #288cbb;
+    --accent2: #1a6e96;
+    --accent3: #0ea871;
+    --accent4: #f59e0b;
+    --text: #0f0f0f;
+    --text-dim: #64748b;
+    --border: rgba(40,140,187,0.18);
+    --card: rgba(255,255,255,0.95);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── SLIDESHOW ── */
+  .slideshow { width: 100vw; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 60px;
+    opacity: 0; transform: translateX(60px);
+    transition: opacity .5s ease, transform .5s ease;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1; transform: translateX(0);
+    pointer-events: all;
+  }
+  .slide.exit {
+    opacity: 0; transform: translateX(-60px);
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(40,140,187,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40,140,187,.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    z-index: 0;
+  }
+  .slide { z-index: 1; }
+
+  /* ── GLOW ORBS ── */
+  .orb {
+    position: fixed; border-radius: 50%;
+    filter: blur(140px); opacity: .12; z-index: 0;
+    pointer-events: none;
+  }
+  .orb1 { width: 600px; height: 600px; background: #74e2c5; top: -200px; right: -100px; }
+  .orb2 { width: 500px; height: 500px; background: #288cbb; bottom: -200px; left: -100px; }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 16px; z-index: 10;
+  }
+  .nav button {
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--accent); padding: 10px 24px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(40,140,187,.12);
+    transition: background .2s, transform .1s;
+  }
+  .nav button:hover { background: rgba(40,140,187,.08); transform: scale(1.05); }
+  .nav .counter { color: var(--text-dim); font-size: 14px; min-width: 60px; text-align: center; }
+
+  /* ── PROGRESS BAR ── */
+  .progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); z-index: 20; transition: width .4s; }
+
+  /* ── SLIDE NUMBER ── */
+  .slide-num {
+    position: fixed; top: 24px; right: 32px;
+    font-size: 12px; color: var(--text-dim); z-index: 10;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── TYPOGRAPHY ── */
+  .kicker {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 16px; font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(36px, 5vw, 68px); font-weight: 800;
+    line-height: 1.1; text-align: center;
+    background: linear-gradient(135deg, #0f0f0f 0%, var(--accent) 55%, #74e2c5 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  h2 {
+    font-size: clamp(24px, 3vw, 40px); font-weight: 700;
+    background: linear-gradient(90deg, #0f0f0f, var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 32px;
+  }
+  .subtitle {
+    font-size: 18px; color: var(--text-dim); margin-top: 16px; text-align: center;
+  }
+  .author {
+    margin-top: 48px; font-size: 14px; color: var(--text-dim);
+    border-top: 1px solid var(--border); padding-top: 20px; text-align: center;
+  }
+  .author strong { color: var(--accent); }
+
+  /* ── CARDS ── */
+  .cards { display: grid; gap: 20px; width: 100%; max-width: 1000px; }
+  .cards-3 { grid-template-columns: repeat(3, 1fr); }
+  .cards-2 { grid-template-columns: repeat(2, 1fr); }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px;
+    box-shadow: 0 2px 16px rgba(40,140,187,.08);
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 8px 28px rgba(40,140,187,.15); }
+  .card .icon { font-size: 32px; margin-bottom: 12px; }
+  .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #0f0f0f; }
+  .card p, .card li { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+  .card ul { padding-left: 16px; }
+  .card .stat {
+    font-size: 28px; font-weight: 800; color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .card.accent-green { border-color: rgba(16,185,129,.3); }
+  .card.accent-green .stat { color: var(--accent3); }
+  .card.accent-purple { border-color: rgba(124,58,237,.3); }
+  .card.accent-purple .stat { color: var(--accent2); }
+  .card.accent-amber { border-color: rgba(245,158,11,.3); }
+  .card.accent-amber .stat { color: var(--accent4); }
+
+  /* ── BIG QUOTE ── */
+  .quote-block {
+    max-width: 800px; text-align: center;
+  }
+  .quote-block blockquote {
+    font-size: clamp(18px, 2.5vw, 26px); font-style: italic;
+    color: var(--text); line-height: 1.5;
+    border-left: 4px solid var(--accent);
+    padding-left: 28px; text-align: left;
+    margin: 24px 0;
+  }
+  .quote-source { font-size: 14px; color: var(--text-dim); }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; }
+  .flow-step {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px;
+    text-align: center; min-width: 120px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .flow-step strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+  .flow-arrow {
+    font-size: 24px; color: var(--accent); margin: 0 8px; flex-shrink: 0;
+  }
+  .flow-step.highlight { border-color: var(--accent); background: rgba(79,142,247,.1); }
+  .flow-step.green { border-color: var(--accent3); background: rgba(16,185,129,.08); }
+  .flow-step.red-bad { border-color: #ef4444; background: rgba(239,68,68,.08); }
+
+  /* ── COMPARISON TABLE ── */
+  .compare {
+    width: 100%; max-width: 1100px;
+    border-collapse: collapse; font-size: 13px;
+  }
+  .compare th {
+    padding: 14px 16px; text-align: left;
+    border-bottom: 2px solid var(--border);
+    color: var(--accent); font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(40,140,187,.05);
+  }
+  .compare td {
+    padding: 12px 16px; border-bottom: 1px solid rgba(40,140,187,.08);
+    color: var(--text-dim); vertical-align: top;
+  }
+  .compare tr:hover td { background: rgba(40,140,187,.04); }
+  .compare .label { color: #0f0f0f; font-weight: 600; font-size: 14px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; margin: 2px;
+  }
+  .badge-green { background: rgba(16,185,129,.2); color: var(--accent3); }
+  .badge-red   { background: rgba(239,68,68,.2);  color: #f87171; }
+  .badge-blue  { background: rgba(79,142,247,.2); color: var(--accent); }
+
+  /* ── PRINCIPLE BLOCK ── */
+  .principle {
+    background: linear-gradient(135deg, rgba(40,140,187,.08), rgba(116,226,197,.12));
+    border: 1px solid rgba(40,140,187,.25);
+    border-radius: 20px; padding: 40px; max-width: 800px; text-align: center;
+    box-shadow: 0 4px 24px rgba(40,140,187,.1);
+  }
+  .principle h2 { font-size: clamp(22px, 3vw, 38px); margin-bottom: 16px; }
+  .principle p { font-size: 16px; color: var(--text-dim); line-height: 1.7; }
+
+  /* ── TAKEAWAY LIST ── */
+  .takeaways { max-width: 700px; width: 100%; }
+  .takeaway {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 18px 0; border-bottom: 1px solid var(--border);
+  }
+  .takeaway:last-child { border-bottom: none; }
+  .takeaway .num {
+    font-size: 32px; font-weight: 800; color: var(--accent);
+    line-height: 1; min-width: 40px; opacity: .6;
+  }
+  .takeaway .text { font-size: 16px; color: var(--text-dim); line-height: 1.5; }
+  .takeaway .text strong { color: #0f0f0f; }
+
+  /* ── DECISION TREE ── */
+  .dtree { max-width: 900px; width: 100%; }
+  .dtree-row { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .dtree-q {
+    background: rgba(79,142,247,.1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 18px; font-size: 14px; color: var(--text);
+    min-width: 280px;
+  }
+  .dtree-arrow { color: var(--accent); font-size: 20px; }
+  .dtree-a {
+    border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700;
+  }
+  .dtree-a.blue  { background: rgba(79,142,247,.15); color: var(--accent); border: 1px solid rgba(79,142,247,.3); }
+  .dtree-a.green { background: rgba(16,185,129,.15); color: var(--accent3); border: 1px solid rgba(16,185,129,.3); }
+  .dtree-a.purple { background: rgba(124,58,237,.15); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+  .dtree-a.amber { background: rgba(245,158,11,.15); color: var(--accent4); border: 1px solid rgba(245,158,11,.3); }
+  .dtree-a.slate { background: rgba(148,163,184,.1); color: var(--text-dim); border: 1px solid rgba(148,163,184,.2); }
+
+  /* ── AGENDA ── */
+  .agenda { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 800px; width: 100%; }
+  .agenda-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: 0 2px 8px rgba(40,140,187,.07);
+    font-size: 14px; color: var(--text-dim);
+  }
+  .agenda-item .n {
+    font-size: 20px; font-weight: 800; color: var(--accent); min-width: 28px;
+  }
+
+  /* ── FAQ ── */
+  .faq { max-width: 800px; width: 100%; }
+  .faq-item { margin-bottom: 20px; }
+  .faq-q { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  .faq-a { font-size: 14px; color: var(--text-dim); line-height: 1.6; padding-left: 16px; border-left: 2px solid var(--border); }
+
+  /* ── SOURCES ── */
+  .sources { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
+  .source-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--card);
+    font-size: 13px; color: var(--text-dim);
+  }
+  .source-item .src-icon { font-size: 20px; }
+
+  /* ── FINAL SLIDE ── */
+  .final { text-align: center; max-width: 700px; }
+  .final .big-quote {
+    font-size: clamp(20px, 2.5vw, 32px); font-style: italic;
+    color: var(--text); line-height: 1.4; margin: 32px 0;
+  }
+  .final .big-quote em { color: var(--accent); font-style: normal; }
+
+  /* ── KEYFRAMES ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .slide.active .card,
+  .slide.active .takeaway,
+  .slide.active .dtree-row,
+  .slide.active .agenda-item,
+  .slide.active .faq-item {
+    animation: fadeUp .4s ease both;
+  }
+  .slide.active .card:nth-child(1),
+  .slide.active .takeaway:nth-child(1),
+  .slide.active .dtree-row:nth-child(1),
+  .slide.active .agenda-item:nth-child(1),
+  .slide.active .faq-item:nth-child(1) { animation-delay: .05s; }
+  .slide.active .card:nth-child(2),
+  .slide.active .takeaway:nth-child(2),
+  .slide.active .dtree-row:nth-child(2),
+  .slide.active .agenda-item:nth-child(2),
+  .slide.active .faq-item:nth-child(2) { animation-delay: .12s; }
+  .slide.active .card:nth-child(3),
+  .slide.active .takeaway:nth-child(3),
+  .slide.active .dtree-row:nth-child(3),
+  .slide.active .agenda-item:nth-child(3),
+  .slide.active .faq-item:nth-child(3) { animation-delay: .19s; }
+  .slide.active .card:nth-child(4),
+  .slide.active .takeaway:nth-child(4),
+  .slide.active .dtree-row:nth-child(4),
+  .slide.active .agenda-item:nth-child(4),
+  .slide.active .faq-item:nth-child(4) { animation-delay: .26s; }
+  .slide.active .card:nth-child(5),
+  .slide.active .takeaway:nth-child(5),
+  .slide.active .dtree-row:nth-child(5),
+  .slide.active .agenda-item:nth-child(5),
+  .slide.active .faq-item:nth-child(5) { animation-delay: .33s; }
+  .slide.active .card:nth-child(6),
+  .slide.active .takeaway:nth-child(6),
+  .slide.active .dtree-row:nth-child(6),
+  .slide.active .agenda-item:nth-child(6) { animation-delay: .40s; }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="progress" id="progress"></div>
+<div class="slide-num" id="slideNum"></div>
+
+<div class="slideshow" id="slideshow">
+
+  <!-- ═══ SLIDE 1: TYTUŁ ═══ -->
+  <div class="slide active">
+    <div class="kicker">Softkraft</div>
+    <h1>Fundamentals of<br>Intelligent Search<br>&amp; Answer Generation</h1>
+    <p class="subtitle">Beyond Naive RAG → Knowledge Representation → Context Engineering</p>
+    <div class="author">
+      <strong>Monika Sadlok</strong> · Softkraft · kwiecień 2026
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 2: AGENDA ═══ -->
+  <div class="slide">
+    <div class="kicker">Plan prezentacji</div>
+    <h2>Agenda</h2>
+    <div class="agenda">
+      <div class="agenda-item"><span class="n">01</span> Trzy sygnały z rynku</div>
+      <div class="agenda-item"><span class="n">02</span> Co nie działa w naiwnym RAG</div>
+      <div class="agenda-item"><span class="n">03</span> Zasada fundamentalna</div>
+      <div class="agenda-item"><span class="n">04</span> Cztery podejścia do retrievalu</div>
+      <div class="agenda-item"><span class="n">05</span> Context Engineering</div>
+      <div class="agenda-item"><span class="n">06</span> Agentic Search w praktyce</div>
+      <div class="agenda-item"><span class="n">07</span> Advisor Strategy</div>
+      <div class="agenda-item"><span class="n">08</span> Framework decyzyjny</div>
+      <div class="agenda-item"><span class="n">09</span> Kluczowe wnioski &amp; Q&amp;A</div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 3: TL;DR — TRZY SYGNAŁY ═══ -->
+  <div class="slide">
+    <div class="kicker">TL;DR</div>
+    <h2>Trzy sygnały, które poruszyły branżę</h2>
+    <div class="cards cards-3" style="max-width:1100px">
+      <div class="card">
+        <div class="stat">18M+</div>
+        <h3>Andrej Karpathy</h3>
+        <p>Osobiste bazy wiedzy bez wektorów. LLM kompiluje surowe źródła do narastającej wiki.</p>
+      </div>
+      <div class="card accent-green">
+        <div class="stat">Wyrzucili</div>
+        <h3>Anthropic / Claude Code</h3>
+        <p>Boris Cherny: klasyczny RAG + lokalny vector DB zastąpiony przez agentic search.</p>
+      </div>
+      <div class="card accent-purple">
+        <div class="stat">24k ★</div>
+        <h3>PageIndex</h3>
+        <p>"Vectorless, reasoning-based RAG" — hierarchiczne drzewo dokumentu zamiast chunkowania.</p>
+      </div>
+    </div>
+    <p style="margin-top:28px; font-size:15px; color:var(--text-dim); text-align:center;">
+      Trzy niezależne zespoły · Trzy różne domeny · <strong style="color:var(--accent)">Jeden kierunek</strong>
+    </p>
+  </div>
+
+  <!-- ═══ SLIDE 4: DWA BŁĘDNE WNIOSKI ═══ -->
+  <div class="slide">
+    <div class="kicker">Uwaga</div>
+    <h2>Dwa błędne wnioski</h2>
+    <div class="cards cards-2" style="max-width:800px">
+      <div class="card" style="border-color:#ef444480">
+        <h3>Błąd #1</h3>
+        <p style="font-size:16px; color:var(--text);">"Pojawiła się zupełnie nowa rewolucja"</p>
+      </div>
+      <div class="card" style="border-color:#ef444480">
+        <h3>Błąd #2</h3>
+        <p style="font-size:16px; color:var(--text);">"RAG właśnie umarł"</p>
+      </div>
+    </div>
+    <div class="principle" style="margin-top:28px; padding:28px;">
+      <p style="font-size:18px; color:var(--text); line-height:1.6;">
+        <strong style="color:var(--accent2);">Prawda:</strong> Rynek dojrzewa i wraca do fundamentów.<br><br>
+        <em style="color:var(--accent);">R w RAG nigdy nie oznaczało:</em><br>
+        "wrzuć cokolwiek do vector DB i licz że model sobie poradzi"<br><br>
+        <strong>R = najpierw reprezentacja wiedzy, potem retrieval</strong>
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 5: CO JEST NIE TAK Z NAIWNYM RAG ═══ -->
+  <div class="slide">
+    <div class="kicker">Problem</div>
+    <h2>Co nie działa w naiwnym RAG</h2>
+    <div style="display:flex; gap:32px; align-items:flex-start; max-width:1100px; width:100%;">
+      <div style="flex:1;">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px; letter-spacing:1px; text-transform:uppercase;">Klasyczny pipeline</p>
+        <div class="flow" style="flex-direction:column; align-items:flex-start; gap:8px;">
+          <div class="flow-step red-bad" style="width:100%;"><strong>Dokument</strong></div>
+          <div class="flow-arrow" style="margin:0 0 0 24px;">↓</div>
+          <div class="flow-step red-bad" style="width:100%;"><strong>Chunking</strong> 800 tokenów</div>
+          <div class="flow-arrow" style="margin:0 0 0 24px;">↓</div>
+          <div class="flow-step red-bad" style="width:100%;"><strong>Embeddings</strong> + Vector DB</div>
+          <div class="flow-arrow" style="margin:0 0 0 24px;">↓</div>
+          <div class="flow-step red-bad" style="width:100%;"><strong>Semantic Search</strong> top-5</div>
+          <div class="flow-arrow" style="margin:0 0 0 24px;">↓</div>
+          <div class="flow-step red-bad" style="width:100%;"><strong>LLM</strong> „miej nadzieję"</div>
+        </div>
+      </div>
+      <div style="flex:2;">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px; letter-spacing:1px; text-transform:uppercase;">Problemy</p>
+        <div class="cards" style="grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="card" style="padding:16px; border-color:#ef444450;">
+            <h3 style="font-size:13px;">Chunking niszczy strukturę</h3>
+            <p style="font-size:12px;">Tabela finansowa rozerwana na kawałki traci sens. Nagłówki znikają.</p>
+          </div>
+          <div class="card" style="padding:16px; border-color:#ef444450;">
+            <h3 style="font-size:13px;">Embedding drift</h3>
+            <p style="font-size:12px;">Wektory starzeją się z każdą zmianą dokumentu. Re-indexing = koszt.</p>
+          </div>
+          <div class="card" style="padding:16px; border-color:#ef444450;">
+            <h3 style="font-size:13px;">Black box retrieval</h3>
+            <p style="font-size:12px;">Nie wiadomo dlaczego dany chunk trafił do kontekstu. Zero audytu.</p>
+          </div>
+          <div class="card" style="padding:16px; border-color:#ef444450;">
+            <h3 style="font-size:13px;">Semantic ≠ Logical</h3>
+            <p style="font-size:12px;">"Podobny" fragment to nie to samo co "właściwy" fragment.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 6: ZASADA FUNDAMENTALNA ═══ -->
+  <div class="slide">
+    <div class="kicker">Rdzeń</div>
+    <div class="principle">
+      <h2 style="font-size:clamp(28px,4vw,52px); margin-bottom:24px;">Najpierw reprezentacja wiedzy.<br>Potem retrieval.</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:32px; text-align:left;">
+        <div>
+          <p style="font-size:13px; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:12px;">Zacznij od</p>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text);">✓ <span>Natury danych</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text);">✓ <span>Struktury źródeł</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text);">✓ <span>Warstwy pośredniej</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text);">✓ <span>Proweniencji</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text);">✓ <span>Audytowalności</span></div>
+          </div>
+        </div>
+        <div>
+          <p style="font-size:13px; color:#f87171; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px;">Nie od</p>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text-dim);">✗ <span>Wyboru narzędzia</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text-dim);">✗ <span>"Jaki framework?"</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text-dim);">✗ <span>"Ile chunków?"</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text-dim);">✗ <span>"Który vector DB?"</span></div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:15px; color:var(--text-dim);">✗ <span>"Jaki model embeddingów?"</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 7: SYGNAŁ 1 — KARPATHY ═══ -->
+  <div class="slide">
+    <div class="kicker">Sygnał #1</div>
+    <h2>Karpathy: Wiedza powinna się kumulować</h2>
+    <div style="display:flex; gap:40px; align-items:flex-start; max-width:1100px; width:100%;">
+      <div style="flex:1;">
+        <div class="flow" style="flex-direction:column; align-items:stretch; gap:0;">
+          <div class="flow-step" style="border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.06);">
+            <strong>raw/</strong>Surowe, niezmienne źródła
+          </div>
+          <div class="flow-arrow" style="text-align:center; margin:8px 0;">↓ LLM kompiluje</div>
+          <div class="flow-step highlight">
+            <strong>🗂️ Wiki (Markdown)</strong>Pojęcia · Encje · Summary · Linki
+          </div>
+          <div class="flow-arrow" style="text-align:center; margin:8px 0;">↓ Pytasz warstwę syntezy</div>
+          <div class="flow-step green">
+            <strong>Odpowiedź</strong>Z proweniencją do źródła
+          </div>
+          <div class="flow-arrow" style="text-align:center; margin:8px 0;">↑ Wzbogaca wiki</div>
+        </div>
+      </div>
+      <div style="flex:2; display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+          <h3>Kluczowa zmiana</h3>
+          <p style="font-size:15px; color:var(--text); line-height:1.7;">
+            Ciężar przeniesiony z <span style="color:#f87171;">czasu pytania</span><br>
+            na <span style="color:var(--accent3);">czas porządkowania wiedzy</span>
+          </p>
+        </div>
+        <div class="card">
+          <h3>Skala</h3>
+          <p>Mała i średnia skala — działa świetnie<br>
+          Duża skala — potrzeba hierarchii, lepszej nawigacji, provenance</p>
+        </div>
+        <div class="card accent-amber">
+          <h3>Softkraft nazywa to</h3>
+          <p style="font-size:15px; color:var(--text);">
+            <strong>Mapa wiedzy</strong> — raw/ (źródła prawdy) + warstwa syntezy (nawigacja)
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 8: SYGNAŁ 2 — CLAUDE CODE ═══ -->
+  <div class="slide">
+    <div class="kicker">Sygnał #2 · luty 2026</div>
+    <h2>Anthropic wyrzuca RAG z Claude Code</h2>
+    <div class="quote-block" style="max-width:900px; margin-bottom:24px;">
+      <blockquote>
+        "Wczesne wersje korzystały z RAG + lokalnej bazy wektorowej, ale dość szybko odkryliśmy, że wyszukiwanie agentowe działa lepiej. Jest prostsze i nie ma problemów z bezpieczeństwem, prywatnością, nieaktualnością danych ani niezawodnością."
+      </blockquote>
+      <p class="quote-source">— Boris Cherny, odpowiedzialny za Claude Code, Anthropic</p>
+    </div>
+    <div class="cards cards-2" style="max-width:900px;">
+      <div class="card" style="border-color:#ef444450;">
+        <h3>Stary system</h3>
+        <p>Chunk → Vector DB → Semantic search → Top-5 chunków → LLM → "miej nadzieję"</p>
+      </div>
+      <div class="card accent-green">
+        <h3>Nowy system</h3>
+        <p>Agent aktywnie przeszukuje repo → decyduje co czytać → zmienia query → zarządza kontekstem przez warstwy (CLAUDE.md) → weryfikuje → subagenci</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:16px; flex-wrap:wrap; justify-content:center;">
+      <span class="badge badge-blue">Dokładność</span>
+      <span class="badge badge-blue">Aktualność (live)</span>
+      <span class="badge badge-blue">Prywatność</span>
+      <span class="badge badge-blue">Brak stale index</span>
+      <span class="badge badge-blue">Iteracyjny reasoning</span>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 9: SYGNAŁ 3 — PAGEINDEX + AGENTIC FILE SEARCH ═══ -->
+  <div class="slide">
+    <div class="kicker">Sygnał #3</div>
+    <h2>PageIndex &amp; Agentic File Search</h2>
+    <div class="cards cards-2" style="max-width:1000px;">
+      <div class="card accent-purple">
+        <h3>PageIndex — Tree-based Retrieval</h3>
+        <div class="flow" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:12px;">
+          <div class="flow-step" style="padding:8px 12px; font-size:12px;"><strong>Dokument</strong></div>
+          <div style="text-align:center; color:var(--accent2); font-size:16px;">↓</div>
+          <div class="flow-step" style="padding:8px 12px; font-size:12px; border-color:rgba(124,58,237,.4);"><strong>Hierarchiczne drzewo sekcji</strong> (smart ToC)</div>
+          <div style="text-align:center; color:var(--accent2); font-size:16px;">↓</div>
+          <div class="flow-step" style="padding:8px 12px; font-size:12px; border-color:rgba(124,58,237,.4);"><strong>LLM nawiguje jak ekspert</strong> → sekcja → podsekcja</div>
+          <div style="text-align:center; color:var(--accent2); font-size:16px;">↓</div>
+          <div class="flow-step green" style="padding:8px 12px; font-size:12px;"><strong>Odpowiedź z odniesieniem do stron</strong></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Agentic File Search (GitHub)</h3>
+        <p style="margin-bottom:12px; font-size:13px; color:var(--text-dim);">3-fazowa strategia nawigacji:</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span style="background:rgba(79,142,247,.2); color:var(--accent); padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700;">1</span>
+            <span style="font-size:13px;">PARALLEL SCAN — preview wszystkich plików</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span style="background:rgba(16,185,129,.2); color:var(--accent3); padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700;">2</span>
+            <span style="font-size:13px;">DEEP DIVE — analiza trafnych plików</span>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span style="background:rgba(124,58,237,.2); color:#a78bfa; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700;">3</span>
+            <span style="font-size:13px;">BACKTRACK — podążanie za cross-referencjami</span>
+          </div>
+        </div>
+        <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
+          <span class="badge badge-green">~$0.001/query</span>
+          <span class="badge badge-blue">Multi-format PDF/Word</span>
+          <span class="badge badge-blue">Citation-aware</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 10: CONTEXT ENGINEERING ═══ -->
+  <div class="slide">
+    <div class="kicker">Nowy paradygmat · Callstack.com</div>
+    <h2>Context Engineering</h2>
+    <div style="display:flex; gap:28px; max-width:1100px; width:100%;">
+      <div style="flex:1.3;">
+        <div class="card" style="margin-bottom:16px;">
+          <h3>Co to jest?</h3>
+          <p style="font-size:15px; color:var(--text); line-height:1.7;">
+            Zamiast szukać danych — <strong>celowo strukturyzujesz</strong> co model widzi i jak ma się zachować.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Techniki</h3>
+          <ul style="list-style:none; display:flex; flex-direction:column; gap:6px; padding:0; margin-top:8px;">
+            <li style="font-size:13px;">→ Schema enforcement (JSON validation)</li>
+            <li style="font-size:13px;">→ Structured system prompts</li>
+            <li style="font-size:13px;">→ Metadata injection (timestamp, role, source)</li>
+            <li style="font-size:13px;">→ Tool usage constraints</li>
+            <li style="font-size:13px;">→ Deterministic preprocessing</li>
+          </ul>
+        </div>
+      </div>
+      <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+        <div class="card accent-green">
+          <h3>Context Engineering wygrywa gdy:</h3>
+          <ul style="margin-top:8px;">
+            <li>Mała/statyczna baza wiedzy</li>
+            <li>Wymagana niska latencja</li>
+            <li>Precyzja &gt; recall</li>
+            <li>Internal copilots, policy Q&amp;A</li>
+          </ul>
+        </div>
+        <div class="card accent-amber">
+          <h3>RAG nadal ma sens gdy:</h3>
+          <ul style="margin-top:8px;">
+            <li>Duże, często aktualizowane dane</li>
+            <li>Wymagane cytowania (research)</li>
+            <li>Multi-tenant platformy</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 11: ADVISOR STRATEGY ═══ -->
+  <div class="slide">
+    <div class="kicker">Anthropic Blog · Multi-model intelligence</div>
+    <h2>The Advisor Strategy</h2>
+    <div style="display:flex; gap:28px; max-width:1100px; width:100%; align-items:flex-start;">
+      <div style="flex:1.4;">
+        <div style="display:flex; gap:16px; margin-bottom:20px;">
+          <div class="card" style="flex:1; text-align:center;">
+            <h3>EXECUTOR</h3>
+            <p style="color:var(--accent);">Sonnet / Haiku</p>
+            <p style="font-size:12px; margin-top:8px;">Wywołuje narzędzia · Interpretuje wyniki · Iteruje · Eskaluje gdy wątpi</p>
+          </div>
+          <div style="display:flex; align-items:center; font-size:28px; color:var(--accent);">⇄</div>
+          <div class="card accent-purple" style="flex:1; text-align:center;">
+            <h3>ADVISOR</h3>
+            <p style="color:#a78bfa;">Opus</p>
+            <p style="font-size:12px; margin-top:8px;">Nigdy nie wywołuje narzędzi · Krótki plan/korekta/stop · 400–700 tokenów</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Kluczowa zasada</h3>
+          <p style="font-size:14px; color:var(--text); line-height:1.6;">
+            Mniejszy model zbiera kontekst i wykonuje. Duży model decyduje co jest istotne. <strong>Retrieval i reasoning rozdzielone na warstwy.</strong>
+          </p>
+        </div>
+      </div>
+      <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+        <div class="card accent-green">
+          <h3>Wyniki benchmarków</h3>
+          <div style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+            <div>
+              <p style="font-size:12px; color:var(--text-dim);">Sonnet + Opus advisor (SWE-bench)</p>
+              <p style="font-size:15px; color:var(--accent3);">+2.7pp dokładności · <strong>−11.9% kosztów</strong></p>
+            </div>
+            <div style="border-top:1px solid var(--border); padding-top:10px;">
+              <p style="font-size:12px; color:var(--text-dim);">Haiku + Opus advisor (BrowseComp)</p>
+              <p style="font-size:15px; color:var(--accent3);">41.2% vs 19.7% solo · <strong>−85% kosztów</strong></p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Zastosowanie w retrieval</h3>
+          <p style="font-size:13px; line-height:1.6;">Executor przeszukuje i zbiera kontekst. Advisor ocenia trafność i kieruje dalszymi krokami. Inteligencja bez pełnych kosztów.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 12: PORÓWNANIE PODEJŚĆ ═══ -->
+  <div class="slide">
+    <div class="kicker">Mapa rozwiązań</div>
+    <h2>Cztery podejścia — porównanie</h2>
+    <table class="compare" style="max-width:1100px;">
+      <thead>
+        <tr>
+          <th>Podejście</th>
+          <th>Warstwa pośrednia</th>
+          <th>Najlepsze dla</th>
+          <th>Zalety</th>
+          <th>Wyzwania</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="label">Naiwny RAG</td>
+          <td>Chunk + Vector DB</td>
+          <td>Proste teksty, MVP</td>
+          <td><span class="badge badge-blue">Szybki start</span></td>
+          <td><span class="badge badge-red">Brak struktury</span> <span class="badge badge-red">Opacity</span></td>
+        </tr>
+        <tr>
+          <td class="label">Karpathy Wiki</td>
+          <td>Skompilowana wiki</td>
+          <td>Osobiste / średnia skala</td>
+          <td><span class="badge badge-green">Kumuluje wiedzę</span> <span class="badge badge-green">Proweniencja</span></td>
+          <td><span class="badge badge-red">Skalowanie</span></td>
+        </tr>
+        <tr>
+          <td class="label">Agentic Search</td>
+          <td>Instrukcje + live read</td>
+          <td>Kod, dynamiczne dane</td>
+          <td><span class="badge badge-green">Dokładność</span> <span class="badge badge-green">Aktualność</span></td>
+          <td><span class="badge badge-red">Koszt tokenów</span></td>
+        </tr>
+        <tr>
+          <td class="label">Tree-based</td>
+          <td>Hierarchia dokumentu</td>
+          <td>Długie PDF-y, raporty</td>
+          <td><span class="badge badge-green">Struktura</span> <span class="badge badge-green">Cytowania</span></td>
+          <td><span class="badge badge-red">Tylko ustrukturyzowane</span></td>
+        </tr>
+        <tr>
+          <td class="label">Context Eng.</td>
+          <td>Metadane + prompty</td>
+          <td>Małe, statyczne bazy</td>
+          <td><span class="badge badge-green">Niska latencja</span> <span class="badge badge-green">Prosto</span></td>
+          <td><span class="badge badge-red">Ograniczona skala</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═══ SLIDE 13: FRAMEWORK DECYZYJNY ═══ -->
+  <div class="slide">
+    <div class="kicker">Przewodnik praktyczny</div>
+    <h2>Framework decyzyjny: Kiedy co stosować?</h2>
+    <div class="dtree">
+      <div class="dtree-row">
+        <div class="dtree-q">Kod i repozytoria (dynamiczne, wymagają precyzji)</div>
+        <div class="dtree-arrow">→</div>
+        <div class="dtree-a green">Agentic Search<br><small>Claude Code model</small></div>
+      </div>
+      <div class="dtree-row">
+        <div class="dtree-q">Długie, strukturalne dokumenty (PDF, raporty, filingi)</div>
+        <div class="dtree-arrow">→</div>
+        <div class="dtree-a purple">Tree-based<br><small>PageIndex model</small></div>
+      </div>
+      <div class="dtree-row">
+        <div class="dtree-q">Osobista/zespołowa baza wiedzy (research, notatki)</div>
+        <div class="dtree-arrow">→</div>
+        <div class="dtree-a amber">Wiki / Knowledge Map<br><small>Karpathy model</small></div>
+      </div>
+      <div class="dtree-row">
+        <div class="dtree-q">Mała, statyczna baza (policy, FAQ, copilot)</div>
+        <div class="dtree-arrow">→</div>
+        <div class="dtree-a blue">Context Engineering<br><small>direct context</small></div>
+      </div>
+      <div class="dtree-row">
+        <div class="dtree-q">Duże, dynamiczne dane (multi-tenant, cytowania)</div>
+        <div class="dtree-arrow">→</div>
+        <div class="dtree-a slate">Hybrid RAG<br><small>z dobrą reprezentacją</small></div>
+      </div>
+      <div style="margin-top:20px; padding:16px; border-radius:10px; background:rgba(79,142,247,.08); border:1px solid var(--border); font-size:14px; color:var(--text-dim);">
+        <strong style="color:var(--accent2);">Zawsze:</strong> Najpierw reprezentacja wiedzy · Proweniencja · Raw/ jako źródło prawdy · Zero religii wobec narzędzi
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 14: FAQ ═══ -->
+  <div class="slide">
+    <div class="kicker">Pytania i odpowiedzi</div>
+    <h2>Najczęstsze pytania</h2>
+    <div class="faq">
+      <div class="faq-item">
+        <div class="faq-q">Czy RAG umarł?</div>
+        <div class="faq-a">Nie. Retrieval + generation jako koncept zostaje. Zmienia się forma retrievalu. Naiwny schemat (chunk + vector DB) jest kwestionowany przez tych, którzy budują najbardziej wymagające systemy.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Czy duże okna kontekstowe (1M tokenów) rozwiążą problem?</div>
+        <div class="faq-a">Podnoszą sufit. Nie rozwiązują: wyboru co jest istotne, nawigacji po wiedzy, audytu źródła. 10k precyzyjnych tokenów &gt; 1M tokenów śmieciowego kontekstu.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Czy wiki nie zamieni się w slop?</div>
+        <div class="faq-a">Tylko jeśli odetniemy proweniencję. Raw/ pozostaje niezmiennym źródłem prawdy. Wiki służy nawigacji i syntezie — nigdy nie zastępuje źródeł.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Czy to się skaluje?</div>
+        <div class="faq-a">Na małej i średniej skali — tak, świetnie. Na dużej — dodaj hierarchię, lepszy search, hybrydy. Ale fundamenty pozwalają skalować cokolwiek.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 15: KLUCZOWE WNIOSKI ═══ -->
+  <div class="slide">
+    <div class="kicker">Podsumowanie</div>
+    <h2>6 kluczowych wniosków</h2>
+    <div class="takeaways">
+      <div class="takeaway">
+        <div class="num">1</div>
+        <div class="text"><strong>Najpierw reprezentacja wiedzy. Potem retrieval.</strong> Zawsze zaczynasz od natury danych, nie od narzędzia.</div>
+      </div>
+      <div class="takeaway">
+        <div class="num">2</div>
+        <div class="text"><strong>Naiwny chunking + vector DB niszczy strukturę danych.</strong> Tabela finansowa rozerwana na kawałki traci sens.</div>
+      </div>
+      <div class="takeaway">
+        <div class="num">3</div>
+        <div class="text"><strong>Dobra warstwa pośrednia</strong> — wiki, drzewo, instrukcje, metadane — zależy od natury danych, nie od hype'u.</div>
+      </div>
+      <div class="takeaway">
+        <div class="num">4</div>
+        <div class="text"><strong>Proweniencja jest obowiązkowa.</strong> Zawsze wiadomo skąd pochodzi odpowiedź. Raw/ = niezmienne źródło prawdy.</div>
+      </div>
+      <div class="takeaway">
+        <div class="num">5</div>
+        <div class="text"><strong>Zero religii wobec narzędzi.</strong> Hybryda tam, gdzie potrzebna. Vector DB ani "zero vectors" — żaden dogmat nie działa.</div>
+      </div>
+      <div class="takeaway">
+        <div class="num">6</div>
+        <div class="text"><strong>Rozumiej zasady, nie tylko framework.</strong> Najcenniejsza umiejętność to ocena co jest wartościowe, a co zniknie za pół roku.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SLIDE 16: DZIĘKUJĘ ═══ -->
+  <div class="slide">
+    <div class="final">
+      <div class="kicker">Softkraft</div>
+      <div class="big-quote">
+        "Czas szamanów w AI powoli mija.<br>
+        <em>Zdrowy rozsądek wraca.</em>"
+      </div>
+      <div class="sources">
+        <div class="source-item"><span class="src-icon">01</span> Karpathy — LLM Knowledge Base (kwiecień 2026, 18M+ wyświetleń)</div>
+        <div class="source-item"><span class="src-icon">02</span> Boris Cherny — Claude Code Architecture (luty 2026, Anthropic)</div>
+        <div class="source-item"><span class="src-icon">03</span> PageIndex — Vectorless Reasoning-Based RAG (GitHub 24k★)</div>
+        <div class="source-item"><span class="src-icon">04</span> PromptEngineer/agentic-file-search (GitHub)</div>
+        <div class="source-item"><span class="src-icon">05</span> Anthropic Blog: The Advisor Strategy</div>
+        <div class="source-item"><span class="src-icon">06</span> Callstack: RAG Is Dead, Long Live Context Engineering</div>
+      </div>
+      <div class="author" style="margin-top:32px;">
+        <strong>Monika Sadlok</strong> · Softkraft · linkedin 25k+ · 2026
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button onclick="prev()">← Wstecz</button>
+  <span class="counter" id="counter">1 / 16</span>
+  <button onclick="next()">Dalej →</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let cur = 0;
+
+  function show(n) {
+    slides[cur].classList.remove('active');
+    slides[cur].classList.add('exit');
+    setTimeout(() => slides[cur >= 0 ? cur : 0].classList.remove('exit'), 500);
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('slideNum').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+  }
+
+  function next() {
+    const n = (cur + 1) % slides.length;
+    slides[cur].classList.remove('active');
+    slides[cur].style.opacity = 0;
+    slides[cur].style.transform = 'translateX(-60px)';
+    setTimeout(() => {
+      slides[cur].style.opacity = '';
+      slides[cur].style.transform = '';
+      cur = n;
+      slides[cur].classList.add('active');
+      update();
+    }, 300);
+  }
+
+  function prev() {
+    const n = (cur - 1 + slides.length) % slides.length;
+    slides[cur].classList.remove('active');
+    slides[cur].style.opacity = 0;
+    slides[cur].style.transform = 'translateX(60px)';
+    setTimeout(() => {
+      slides[cur].style.opacity = '';
+      slides[cur].style.transform = '';
+      cur = n;
+      slides[cur].classList.add('active');
+      update();
+    }, 300);
+  }
+
+  function update() {
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('slideNum').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); prev(); }
+  });
+
+  update();
+</script>
+</body>
+</html>
