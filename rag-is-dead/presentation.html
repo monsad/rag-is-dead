@@ -534,6 +534,70 @@
     </div>
   </div>
 
+  <!-- ═══ SLIDE 7b: OMEGAWIKI — IMPLEMENTACJA KARPATHY PATTERN ═══ -->
+  <div class="slide">
+    <div class="kicker">Implementacja w praktyce · github.com/skyllwt/OmegaWiki</div>
+    <h2>OmegaWiki — Karpathy pattern w produkcji</h2>
+    <div style="display:flex; gap:28px; max-width:1100px; width:100%;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:14px;">
+        <div class="card accent-purple">
+          <h3>9 typów encji</h3>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+            <span class="badge badge-blue">papers</span>
+            <span class="badge badge-blue">concepts</span>
+            <span class="badge badge-blue">topics</span>
+            <span class="badge badge-blue">people</span>
+            <span class="badge badge-blue">ideas</span>
+            <span class="badge badge-blue">experiments</span>
+            <span class="badge badge-blue">claims</span>
+            <span class="badge badge-blue">summaries</span>
+            <span class="badge badge-blue">foundations</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>9 typów relacji</h3>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+            <span class="badge badge-green">extends</span>
+            <span class="badge badge-green">contradicts</span>
+            <span class="badge badge-green">supports</span>
+            <span class="badge badge-green">inspired_by</span>
+            <span class="badge badge-green">tested_by</span>
+            <span class="badge badge-red">invalidates</span>
+            <span class="badge badge-red">supersedes</span>
+            <span class="badge badge-blue">addresses_gap</span>
+            <span class="badge badge-blue">derived_from</span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1.3; display:flex; flex-direction:column; gap:14px;">
+        <div class="card accent-green">
+          <h3>Co wyróżnia vs naiwny RAG</h3>
+          <ul style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+            <li style="font-size:13px;">Wiedza <strong>narasta</strong> — nie jest jednorazowa</li>
+            <li style="font-size:13px;">Explicite tracking <strong>luk w wiedzy</strong></li>
+            <li style="font-size:13px;">Nieudane eksperymenty jako <strong>first-class citizens</strong></li>
+            <li style="font-size:13px;">23 Claude Code Skills — pełny lifecycle badań</li>
+            <li style="font-size:13px;">Automatyczna integracja z arXiv (GitHub Actions)</li>
+          </ul>
+        </div>
+        <div class="card accent-amber">
+          <h3>Workflow</h3>
+          <div class="flow" style="flex-wrap:wrap; gap:6px; justify-content:flex-start;">
+            <span class="badge badge-blue">Ingest paper</span>
+            <span style="color:var(--accent);">→</span>
+            <span class="badge badge-blue">Struktura wiki</span>
+            <span style="color:var(--accent);">→</span>
+            <span class="badge badge-green">Generuj idee</span>
+            <span style="color:var(--accent);">→</span>
+            <span class="badge badge-green">Eksperymenty</span>
+            <span style="color:var(--accent);">→</span>
+            <span class="badge badge-green">Paper</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ SLIDE 8: SYGNAŁ 2 — CLAUDE CODE ═══ -->
   <div class="slide">
     <div class="kicker">Sygnał #2 · luty 2026</div>
@@ -856,6 +920,7 @@
       <div class="sources">
         <div class="source-item"><span class="src-icon">01</span> Karpathy — LLM Knowledge Base (kwiecień 2026, 18M+ wyświetleń)</div>
         <div class="source-item"><span class="src-icon">01b</span> Karpathy — LLM Wiki Gist: Ingest / Query / Lint pattern (gist.github.com)</div>
+        <div class="source-item"><span class="src-icon">01c</span> OmegaWiki — produkcyjna implementacja Karpathy pattern, 9 encji, 9 relacji (github.com/skyllwt)</div>
         <div class="source-item"><span class="src-icon">02</span> Boris Cherny — Claude Code Architecture (luty 2026, Anthropic)</div>
         <div class="source-item"><span class="src-icon">03</span> PageIndex — Vectorless Reasoning-Based RAG (GitHub 24k★)</div>
         <div class="source-item"><span class="src-icon">04</span> PromptEngineer/agentic-file-search (GitHub)</div>
@@ -873,7 +938,7 @@
 <!-- NAV -->
 <div class="nav">
   <button onclick="prev()">← Wstecz</button>
-  <span class="counter" id="counter">1 / 16</span>
+  <span class="counter" id="counter">1 / 17</span>
   <button onclick="next()">Dalej →</button>
 </div>
 
