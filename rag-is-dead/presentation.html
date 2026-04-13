@@ -498,7 +498,7 @@
           </div>
           <div class="flow-arrow" style="text-align:center; margin:8px 0;">↓ LLM kompiluje</div>
           <div class="flow-step highlight">
-            <strong>🗂️ Wiki (Markdown)</strong>Pojęcia · Encje · Summary · Linki
+            <strong>Wiki (Markdown)</strong>Pojęcia · Encje · Summary · Linki
           </div>
           <div class="flow-arrow" style="text-align:center; margin:8px 0;">↓ Pytasz warstwę syntezy</div>
           <div class="flow-step green">
@@ -508,21 +508,25 @@
         </div>
       </div>
       <div style="flex:2; display:flex; flex-direction:column; gap:16px;">
-        <div class="card">
-          <h3>Kluczowa zmiana</h3>
-          <p style="font-size:15px; color:var(--text); line-height:1.7;">
-            Ciężar przeniesiony z <span style="color:#f87171;">czasu pytania</span><br>
-            na <span style="color:var(--accent3);">czas porządkowania wiedzy</span>
+        <div class="card" style="border-color:rgba(40,140,187,.3);">
+          <h3>Cytat z gista</h3>
+          <p style="font-size:13px; font-style:italic; color:var(--text); line-height:1.7;">
+            "Zadanie człowieka: dobierać źródła, kierować analizą, zadawać pytania.<br>
+            Zadanie LLM: wszystko inne."
           </p>
+          <p style="font-size:11px; color:var(--text-dim); margin-top:6px;">— Andrej Karpathy, gist kwiecień 2026</p>
         </div>
         <div class="card">
-          <h3>Skala</h3>
-          <p>Mała i średnia skala — działa świetnie<br>
-          Duża skala — potrzeba hierarchii, lepszej nawigacji, provenance</p>
+          <h3>Trzy operacje wiki</h3>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+            <div style="font-size:13px;"><span style="color:var(--accent); font-weight:700;">Ingest</span> — LLM przetwarza nowe źródła, aktualizuje index, tworzy strony encji</div>
+            <div style="font-size:13px;"><span style="color:var(--accent3); font-weight:700;">Query</span> — szukasz w wiki, odpowiedź z cytatami; cenne eksploracje stają się nowymi stronami</div>
+            <div style="font-size:13px;"><span style="color:var(--accent4); font-weight:700;">Lint</span> — cykliczny health check: sprzeczności, stale claims, orphan pages</div>
+          </div>
         </div>
         <div class="card accent-amber">
           <h3>Softkraft nazywa to</h3>
-          <p style="font-size:15px; color:var(--text);">
+          <p style="font-size:14px; color:var(--text);">
             <strong>Mapa wiedzy</strong> — raw/ (źródła prawdy) + warstwa syntezy (nawigacja)
           </p>
         </div>
@@ -851,6 +855,7 @@
       </div>
       <div class="sources">
         <div class="source-item"><span class="src-icon">01</span> Karpathy — LLM Knowledge Base (kwiecień 2026, 18M+ wyświetleń)</div>
+        <div class="source-item"><span class="src-icon">01b</span> Karpathy — LLM Wiki Gist: Ingest / Query / Lint pattern (gist.github.com)</div>
         <div class="source-item"><span class="src-icon">02</span> Boris Cherny — Claude Code Architecture (luty 2026, Anthropic)</div>
         <div class="source-item"><span class="src-icon">03</span> PageIndex — Vectorless Reasoning-Based RAG (GitHub 24k★)</div>
         <div class="source-item"><span class="src-icon">04</span> PromptEngineer/agentic-file-search (GitHub)</div>
