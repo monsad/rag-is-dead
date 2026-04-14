@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo: MongoDB Vector Search → Vectorless Tree Retrieval</title>
+<style>
+  :root {
+    --bg: #f7f9fb;
+    --bg2: #eef2f7;
+    --accent: #288cbb;
+    --accent2: #1a6e96;
+    --accent3: #0ea871;
+    --accent4: #f59e0b;
+    --text: #0f0f0f;
+    --dim: #64748b;
+    --border: rgba(40,140,187,0.15);
+    --card: #ffffff;
+    --bad: #ef4444;
+    --good: #10b981;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0f1923 0%, #1a2d3d 100%);
+    padding: 28px 40px 24px;
+    border-bottom: 1px solid rgba(40,140,187,.2);
+  }
+  header .badge {
+    display:inline-block; background:rgba(40,140,187,.2); color:var(--accent);
+    font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    padding:4px 12px; border-radius:20px; margin-bottom:12px;
+    border:1px solid rgba(40,140,187,.3);
+  }
+  header h1 { font-size:22px; font-weight:800; color:#fff; margin-bottom:6px; }
+  header p { font-size:13px; color:rgba(255,255,255,.5); }
+
+  /* MAIN */
+  .main { max-width:1300px; margin:0 auto; padding:28px 32px 60px; }
+
+  /* DOCUMENT SECTION */
+  .doc-section { margin-bottom:24px; }
+  .doc-section h2 {
+    font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    color:var(--dim); margin-bottom:12px;
+  }
+  .doc-box {
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:20px 24px; font-size:13px; line-height:1.8;
+    box-shadow:0 2px 8px rgba(40,140,187,.06);
+  }
+  .doc-box .doc-title {
+    font-size:15px; font-weight:700; color:var(--accent); margin-bottom:12px;
+    border-bottom:1px solid var(--border); padding-bottom:8px;
+  }
+  .doc-section-item { color:var(--dim); padding:2px 0; }
+  .doc-section-item strong { color:var(--text); }
+  .doc-meta { margin-top:10px; font-size:11px; color:rgba(148,163,184,.6); }
+
+  /* QUERY BAR */
+  .query-bar {
+    display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap;
+  }
+  .query-bar input {
+    flex:1; min-width:260px; padding:12px 18px;
+    background:var(--card); border:1px solid var(--border); border-radius:10px;
+    font-size:14px; color:var(--text); outline:none;
+  }
+  .query-bar input:focus { border-color:var(--accent); }
+  .query-bar button {
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border:none; border-radius:10px; padding:12px 28px; color:#fff;
+    font-size:14px; font-weight:700; cursor:pointer; transition:opacity .2s;
+    white-space:nowrap;
+  }
+  .query-bar button:hover { opacity:.85; }
+  .presets { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:28px; }
+  .preset-btn {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:20px; padding:6px 16px; font-size:12px; color:var(--dim);
+    cursor:pointer; transition:all .15s;
+  }
+  .preset-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* COLUMNS */
+  .columns { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+  .col-header {
+    padding:14px 20px; border-radius:10px 10px 0 0;
+    font-size:13px; font-weight:700; letter-spacing:.5px;
+  }
+  .col-header.bad { background:rgba(239,68,68,.1); color:#ef4444; border:1px solid rgba(239,68,68,.2); border-bottom:none; }
+  .col-header.good { background:rgba(16,185,129,.1); color:#10b981; border:1px solid rgba(16,185,129,.2); border-bottom:none; }
+  .col-body {
+    border-radius:0 0 10px 10px; padding:20px; min-height:420px;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .col-body.bad { background:rgba(239,68,68,.03); border:1px solid rgba(239,68,68,.15); border-top:none; }
+  .col-body.good { background:rgba(16,185,129,.03); border:1px solid rgba(16,185,129,.15); border-top:none; }
+
+  /* STEPS */
+  .step { display:flex; flex-direction:column; gap:6px; }
+  .step-label {
+    font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--dim);
+  }
+  .step-content { font-size:13px; }
+
+  /* CHUNKS */
+  .chunks { display:flex; flex-direction:column; gap:6px; }
+  .chunk {
+    background:rgba(239,68,68,.06); border:1px solid rgba(239,68,68,.2);
+    border-radius:6px; padding:8px 12px;
+  }
+  .chunk-label { font-size:10px; font-weight:700; color:#ef4444; margin-bottom:3px; letter-spacing:1px; text-transform:uppercase; }
+  .chunk-text { font-size:12px; color:var(--dim); line-height:1.5; }
+  .chunk-bad { text-decoration:line-through; opacity:.4; }
+
+  /* VECTORS */
+  .vectors { display:flex; flex-direction:column; gap:5px; }
+  .vector-item { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .vector-score {
+    font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; min-width:42px; text-align:center;
+  }
+  .score-high { background:rgba(16,185,129,.15); color:var(--good); }
+  .score-mid  { background:rgba(245,158,11,.15);  color:var(--accent4); }
+  .score-low  { background:rgba(148,163,184,.1);  color:var(--dim); }
+  .vector-text { color:var(--dim); }
+
+  /* TREE */
+  .tree { font-family:monospace; font-size:13px; line-height:2; }
+  .tree-node { cursor:default; transition:color .15s; }
+  .tree-node:hover { color:var(--accent); }
+  .tree-node.selected { color:var(--good); font-weight:700; }
+  .tree-node.dim-node { color:rgba(148,163,184,.3); }
+  .tree-connector { color:rgba(148,163,184,.3); }
+  .tree-scanning { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ANSWER BOX */
+  .answer-box {
+    border-radius:10px; padding:16px 18px; font-size:13px; line-height:1.7; margin-top:4px;
+  }
+  .bad-answer { background:rgba(239,68,68,.06); border:1px solid rgba(239,68,68,.2); }
+  .good-answer { background:rgba(16,185,129,.06); border:1px solid rgba(16,185,129,.2); }
+  .provenance {
+    margin-top:10px; padding-top:10px; border-top:1px solid rgba(16,185,129,.15);
+    font-size:11px; color:rgba(16,185,129,.7); font-family:monospace;
+  }
+  .provenance span { display:block; }
+
+  /* VERDICT */
+  .verdict { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .verdict-card { border-radius:10px; padding:20px; }
+  .verdict-card.bad-v { background:rgba(239,68,68,.05); border:1px solid rgba(239,68,68,.15); }
+  .verdict-card.good-v { background:rgba(16,185,129,.05); border:1px solid rgba(16,185,129,.15); }
+  .verdict-card h3 { font-size:13px; font-weight:700; margin-bottom:10px; }
+  .verdict-card.bad-v h3 { color:#ef4444; }
+  .verdict-card.good-v h3 { color:#10b981; }
+  .verdict-card li { font-size:13px; color:var(--dim); margin-left:16px; margin-bottom:4px; line-height:1.5; }
+
+  /* THINKING */
+  .thinking {
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; color:var(--dim); font-style:italic; padding:8px 0;
+  }
+  .dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:blink 1.2s ease-in-out infinite; }
+  .dot:nth-child(2) { animation-delay:.2s; }
+  .dot:nth-child(3) { animation-delay:.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+
+  /* PLACEHOLDER */
+  .placeholder {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:12px; height:100%; min-height:200px; color:rgba(148,163,184,.4);
+    font-size:13px;
+  }
+
+  /* BADGE */
+  .badge {
+    display:inline-block; padding:2px 8px; border-radius:4px;
+    font-size:11px; font-weight:600; margin:2px;
+  }
+  .badge-green { background:rgba(16,185,129,.15); color:var(--good); }
+  .badge-red   { background:rgba(239,68,68,.15);  color:#ef4444; }
+  .badge-blue  { background:rgba(40,140,187,.15); color:var(--accent); }
+  .badge-amber { background:rgba(245,158,11,.15); color:var(--accent4); }
+
+  /* FOOTER */
+  footer {
+    text-align:center; padding:20px; font-size:12px; color:var(--dim);
+    border-top:1px solid var(--border); margin-top:16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Demo #2 · Softkraft</div>
+  <h1>MongoDB Vector Search → Vectorless Tree Retrieval</h1>
+  <p>Migracja z klasycznego RAG (chunking + embeddingi) na reasoning-based nawigację po drzewie dokumentu · zero vector index · pełna proweniencja</p>
+</header>
+
+<div class="main">
+
+  <!-- DOCUMENT -->
+  <div class="doc-section">
+    <h2>Dokument źródłowy</h2>
+    <div class="doc-box">
+      <div class="doc-title">Raport ESG — Acme Corp 2025 · Polityka Środowiskowa i Zrównoważony Rozwój</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 32px;">
+        <div class="doc-section-item"><strong>1. Strategia ESG 2025–2030</strong> — cele, KPIs, roadmapa</div>
+        <div class="doc-section-item"><strong>2. Emisje CO₂</strong> — 2.1 Zakres 1+2 · 2.2 Zakres 3 · 2.3 Cele redukcji</div>
+        <div class="doc-section-item"><strong>3. Energia odnawialna</strong> — 3.1 Zużycie · 3.2 Certyfikaty REC · 3.3 Plan PPA</div>
+        <div class="doc-section-item"><strong>4. Gospodarka wodna</strong> — 4.1 Zużycie · 4.2 Recykling · 4.3 Obszary stress</div>
+        <div class="doc-section-item"><strong>5. Łańcuch dostaw</strong> — 5.1 Audyty dostawców · 5.2 Kryteria ESG · 5.3 Scope 3</div>
+        <div class="doc-section-item"><strong>6. Wyniki finansowe ESG</strong> — 6.1 Inwestycje · 6.2 Oszczędności · 6.3 CAPEX green</div>
+        <div class="doc-section-item"><strong>7. Zarządzanie i compliance</strong> — 7.1 Komitet ESG · 7.2 Raporowanie GRI · 7.3 Audyt</div>
+        <div class="doc-section-item"><strong>8. Cele na 2030</strong> — 8.1 Net Zero · 8.2 Woda · 8.3 Dostawcy</div>
+      </div>
+      <div class="doc-meta">142 strony · 68 500 tokenów · Acme Corp · grudzień 2025</div>
+    </div>
+  </div>
+
+  <!-- QUERY -->
+  <div class="query-bar">
+    <input type="text" id="queryInput" placeholder="Zadaj pytanie o dokument ESG..." value="Jakie są cele redukcji emisji CO₂ na 2030 rok?">
+    <button onclick="runDemo()">Uruchom porównanie</button>
+  </div>
+  <div class="presets">
+    <span class="preset-btn" onclick="setQ('Jakie są cele redukcji emisji CO₂ na 2030 rok?')">Cele CO₂ 2030</span>
+    <span class="preset-btn" onclick="setQ('Ile wynosi zużycie energii odnawialnej i jakie są plany PPA?')">Energia odnawialna</span>
+    <span class="preset-btn" onclick="setQ('Jakie kryteria ESG stosuje firma wobec dostawców?')">Kryteria dostawców</span>
+    <span class="preset-btn" onclick="setQ('Ile firma zainwestowała w projekty zielone i jakie oszczędności osiągnęła?')">Inwestycje ESG</span>
+    <span class="preset-btn" onclick="setQ('Podsumuj strategię ESG na lata 2025–2030')">Strategia ESG</span>
+  </div>
+
+  <!-- COLUMNS -->
+  <div class="columns">
+    <div>
+      <div class="col-header bad">MongoDB Atlas Vector Search (przed)</div>
+      <div class="col-body bad" id="badCol">
+        <div class="placeholder"><span>Kliknij "Uruchom porównanie"</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="col-header good">Vectorless Tree Retrieval (po)</div>
+      <div class="col-body good" id="goodCol">
+        <div class="placeholder"><span>Kliknij "Uruchom porównanie"</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERDICT -->
+  <div class="verdict" id="verdictSection" style="display:none;">
+    <div class="verdict-card bad-v">
+      <h3>MongoDB Vector Search — problemy</h3>
+      <ul id="badVerdict"></ul>
+    </div>
+    <div class="verdict-card good-v">
+      <h3>Vectorless Tree — zalety</h3>
+      <ul id="goodVerdict"></ul>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>Softkraft</strong> · Demo: Migracja z MongoDB Vector Search na Vectorless Tree Retrieval · PageIndex pattern
+</footer>
+
+<script>
+// ─── DOCUMENT TREE ───────────────────────────────────────────────
+const DOC_TREE = {
+  "1. Strategia ESG 2025–2030": {
+    children: ["1.1 Cele strategiczne", "1.2 KPIs", "1.3 Roadmapa"],
+    text: "Acme Corp przyjął strategię ESG obejmującą lata 2025–2030 z celem osiągnięcia Net Zero do 2040. Kluczowe KPIs: redukcja emisji Scope 1+2 o 50% do 2030, 100% energia odnawialna do 2028, zero-waste łańcuch dostaw do 2030."
+  },
+  "2. Emisje CO₂": {
+    children: ["2.1 Zakres 1+2", "2.2 Zakres 3", "2.3 Cele redukcji"],
+    text: "Emisje Scope 1+2 w 2025: 142 000 tCO₂e (spadek 23% r/r). Scope 3: 890 000 tCO₂e. Cel na 2030: redukcja Scope 1+2 o 50% vs baseline 2020 (184 000 tCO₂e). Cel 2030 Scope 3: –30%. Cel 2040: Net Zero."
+  },
+  "2.3 Cele redukcji": {
+    children: [],
+    text: "Cele redukcji emisji CO₂: do 2027 redukcja o 35%, do 2030 o 50% (Scope 1+2 vs 2020). Scope 3 do 2030: –30%. Net Zero Scope 1+2 do 2040. Offsety wyłącznie jako ostateczność – priorytet: real reductions."
+  },
+  "3. Energia odnawialna": {
+    children: ["3.1 Zużycie", "3.2 Certyfikaty REC", "3.3 Plan PPA"],
+    text: "Udział energii odnawialnej w 2025: 67% (wzrost z 41% w 2023). Certyfikaty REC pokrywają 100% zakupionej energii w Polsce. Plan PPA: umowy długoterminowe na 150 MW do 2027."
+  },
+  "6. Wyniki finansowe ESG": {
+    children: ["6.1 Inwestycje", "6.2 Oszczędności", "6.3 CAPEX green"],
+    text: "Inwestycje w projekty ESG w 2025: 47,8 mln PLN (+34% r/r). Oszczędności z efektywności energetycznej: 12,3 mln PLN/rok. CAPEX green stanowi 28% całkowitego CAPEX. ROI projektów ESG: 18% średniorocznie."
+  },
+  "5. Łańcuch dostaw": {
+    children: ["5.1 Audyty dostawców", "5.2 Kryteria ESG", "5.3 Scope 3"],
+    text: "Kryteria ESG dla dostawców obejmują: ocenę emisji Scope 3, minimalne standardy środowiskowe (ISO 14001 lub ekwiwalent), politykę anty-korupcyjną, transparentność raportowania. 847 dostawców przeszło audyt ESG w 2025 (62% bazy)."
+  },
+  "8. Cele na 2030": {
+    children: ["8.1 Net Zero", "8.2 Woda", "8.3 Dostawcy"],
+    text: "Cele 2030: (1) Net Zero Scope 1+2, (2) –30% Scope 3, (3) 100% dostawców z certyfikatem ESG, (4) zero water stress w operacjach własnych, (5) 100% opakowań biodegradowalnych."
+  }
+};
+
+// ─── QUERY DATA ───────────────────────────────────────────────────
+const QUERY_DATA = {
+  "Jakie są cele redukcji emisji CO₂ na 2030 rok?": {
+    badChunks: [
+      { text: "...emisje CO₂e wyniosły 142 000 ton w Q4 przy wzroście produkcji o 8%...", score: 0.71, relevant: false },
+      { text: "...redukcja emisji o 23% rok do roku osiągnięta dzięki modernizacji floty...", score: 0.68, relevant: false },
+      { text: "...cele ESG obejmują obszary: emisje, woda, łańcuch dostaw, energia odnawialna...", score: 0.65, relevant: false },
+      { text: "...w 2025 roku Scope 3 objął dostawców z 47 krajów, łączna wartość...", score: 0.52, relevant: false },
+      { text: "...komitet ESG zatwierdził roadmapę w Q1 2025 na posiedzeniu zarządu...", score: 0.48, relevant: false },
+    ],
+    badAnswer: "Na podstawie dostępnych fragmentów, firma planuje redukcję emisji CO₂ w perspektywie 2030 roku, jednak dokładne wartości docelowe nie są jednoznaczne w dostarczonych fragmentach. Z kontekstu wynika redukcja o 23% r/r.",
+    badProblem: "brak sekcji z celami — chunking rozerwał tabelę celów",
+    goodSections: ["2. Emisje CO₂", "2.3 Cele redukcji", "8. Cele na 2030"],
+    goodAnswer: "Cele redukcji emisji CO₂ na 2030 rok:\n\n**Scope 1+2:** redukcja o **50%** względem baseline 2020 (184 000 tCO₂e → ~92 000 tCO₂e)\n\n**Scope 3:** redukcja o **30%** względem 2025\n\n**Cel 2040:** Net Zero Scope 1+2 (offsety jako ostateczność)\n\nKamień pośredni: do 2027 redukcja Scope 1+2 o 35%",
+    goodProvenance: ["§2.3 Cele redukcji (s. 34)", "§8.1 Net Zero (s. 118)"]
+  },
+  "Ile wynosi zużycie energii odnawialnej i jakie są plany PPA?": {
+    badChunks: [
+      { text: "...certyfikaty REC wystawione przez operatora sieci dla jednostek produkcyjnych...", score: 0.73, relevant: false },
+      { text: "...energia elektryczna z OZE stanowi część miksu energetycznego zakładu...", score: 0.67, relevant: false },
+      { text: "...w obszarze energii realizujemy projekty zgodne z taksonomią EU Green Deal...", score: 0.61, relevant: false },
+      { text: "...CAPEX alokowany na projekty OZE wzrósł w 2025 roku o 34%...", score: 0.55, relevant: false },
+      { text: "...strategia zakupów energii obejmuje zarówno rynek spot jak i kontrakty...", score: 0.49, relevant: false },
+    ],
+    badAnswer: "Firma posiada certyfikaty REC i inwestuje w OZE. Szczegółowe dane o zużyciu i planach PPA wymagają dalszej weryfikacji.",
+    badProblem: "kluczowe dane procentowe w innych chunkach — model ich nie widział",
+    goodSections: ["3. Energia odnawialna"],
+    goodAnswer: "**Aktualne zużycie energii odnawialnej:** 67% całkowitego zużycia energii (wzrost z 41% w 2023)\n\n**Certyfikaty REC:** pokrywają 100% zakupionej energii elektrycznej w Polsce\n\n**Plan PPA (Power Purchase Agreement):** umowy długoterminowe na **150 MW** mocy odnawialnej do 2027 roku",
+    goodProvenance: ["§3.1 Zużycie (s. 45)", "§3.2 Certyfikaty REC (s. 47)", "§3.3 Plan PPA (s. 49)"]
+  },
+  "Jakie kryteria ESG stosuje firma wobec dostawców?": {
+    badChunks: [
+      { text: "...dostawcy zobowiązani do podpisania Kodeksu Etyki Biznesu Acme Corp...", score: 0.69, relevant: false },
+      { text: "...audyty zewnętrzne przeprowadzono w 847 lokalizacjach dostawców w 2025...", score: 0.66, relevant: false },
+      { text: "...łańcuch dostaw obejmuje 1 370 aktywnych dostawców w 47 krajach...", score: 0.63, relevant: false },
+      { text: "...raportowanie Scope 3 kategoria 1 obejmuje zakupy towarów i usług...", score: 0.58, relevant: false },
+      { text: "...procurment policy zaktualizowany w Q2 2025 zgodnie z CSRD wymogami...", score: 0.51, relevant: false },
+    ],
+    badAnswer: "Firma przeprowadza audyty dostawców i wymaga podpisania Kodeksu Etyki. Szczegółowe kryteria ESG nie były dostępne w zwróconych fragmentach.",
+    badProblem: "sekcja kryteriów ESG poza top-5 — model zwrócił mniej trafne chunki",
+    goodSections: ["5. Łańcuch dostaw"],
+    goodAnswer: "Kryteria ESG dla dostawców (§5.2):\n\n1. **Emisje:** ocena i raportowanie Scope 3 (kryterium obowiązkowe od 2026)\n2. **Środowisko:** ISO 14001 lub ekwiwalent\n3. **Etyka:** polityka anty-korupcyjna, whistleblowing\n4. **Transparentność:** roczny raport ESG lub odpowiedź na kwestionariusz\n\nW 2025 audyt ESG przeszło **847 dostawców (62% bazy)**",
+    goodProvenance: ["§5.2 Kryteria ESG (s. 78)", "§5.1 Audyty dostawców (s. 75)"]
+  },
+  "Ile firma zainwestowała w projekty zielone i jakie oszczędności osiągnęła?": {
+    badChunks: [
+      { text: "...CAPEX w Q3 wyniósł 18,2 mln PLN z czego 28% przeznaczono na projekty...", score: 0.72, relevant: false },
+      { text: "...inwestycje kapitałowe obejmują modernizację linii produkcyjnych i digitalizację...", score: 0.65, relevant: false },
+      { text: "...oszczędności operacyjne wynikające z programu lean manufacturing w 2025...", score: 0.61, relevant: false },
+      { text: "...wyniki finansowe za rok 2025 wskazują na poprawę marży EBITDA do 27,5%...", score: 0.57, relevant: false },
+      { text: "...komitet audytowy zatwierdził wydatki inwestycyjne na posiedzeniu w maju 2025...", score: 0.49, relevant: false },
+    ],
+    badAnswer: "Firma zainwestowała znaczące środki w projekty green, stanowiące 28% CAPEX. Oszczędności operacyjne osiągnięto dzięki programom efektywności.",
+    badProblem: "brak konkretnych kwot — chunking rozerwał sekcję wyników finansowych ESG",
+    goodSections: ["6. Wyniki finansowe ESG"],
+    goodAnswer: "**Inwestycje ESG 2025:** 47,8 mln PLN (+34% r/r)\n\n**Oszczędności z efektywności energetycznej:** 12,3 mln PLN/rok\n\n**Udział green CAPEX:** 28% całkowitego CAPEX\n\n**ROI projektów ESG:** 18% średniorocznie",
+    goodProvenance: ["§6.1 Inwestycje (s. 95)", "§6.2 Oszczędności (s. 97)", "§6.3 CAPEX green (s. 99)"]
+  },
+  "Podsumuj strategię ESG na lata 2025–2030": {
+    badChunks: [
+      { text: "...strategia zrównoważonego rozwoju Acme Corp zakłada transformację modelu biznesu...", score: 0.78, relevant: true },
+      { text: "...KPIs środowiskowe monitorowane kwartalnie przez komitet ESG przy zarządzie...", score: 0.71, relevant: false },
+      { text: "...Net Zero jako cel długoterminowy wymaga transformacji łańcucha wartości...", score: 0.68, relevant: false },
+      { text: "...raportowanie zgodne z GRI Standards, TCFD i wymogami CSRD od 2025...", score: 0.65, relevant: false },
+      { text: "...interesariusze zewnętrzni ocenili strategię ESG na 8,4/10 w badaniu 2025...", score: 0.61, relevant: false },
+    ],
+    badAnswer: "Strategia ESG Acme Corp na 2025–2030 obejmuje transformację modelu biznesu w kierunku Net Zero. Szczegółowe cele i KPIs wymagają zapoznania się z pełnym dokumentem.",
+    badProblem: "strategia opisana w wielu miejscach dokumentu — chunking nie oddaje całości",
+    goodSections: ["1. Strategia ESG 2025–2030", "2.3 Cele redukcji", "8. Cele na 2030"],
+    goodAnswer: "**Strategia ESG Acme Corp 2025–2030:**\n\nGłówny cel: **Net Zero do 2040** (Scope 1+2)\n\nKluczowe cele na 2030:\n- Emisje Scope 1+2: **–50%** vs 2020\n- Emisje Scope 3: **–30%** vs 2025\n- Energia odnawialna: **100%**\n- Dostawcy z certyfikatem ESG: **100%**\n- Zero water stress w operacjach własnych\n\nKPIs monitorowane kwartalnie, raportowanie GRI + TCFD + CSRD",
+    goodProvenance: ["§1. Strategia ESG (s. 8)", "§8. Cele na 2030 (s. 115–120)"]
+  }
+};
+
+function setQ(q) {
+  document.getElementById('queryInput').value = q;
+}
+
+function thinking(label) {
+  return `<div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span>${label}</span></div>`;
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runDemo() {
+  const query = document.getElementById('queryInput').value.trim();
+  if (!query) return;
+
+  const data = QUERY_DATA[query] || QUERY_DATA["Jakie są cele redukcji emisji CO₂ na 2030 rok?"];
+
+  document.getElementById('verdictSection').style.display = 'none';
+  document.getElementById('badCol').innerHTML = '';
+  document.getElementById('goodCol').innerHTML = '';
+
+  await Promise.all([runBad(data), runGood(data)]);
+
+  // Verdict
+  document.getElementById('badVerdict').innerHTML = [
+    'Chunking rozerwie tabele i listy celów',
+    'Embedding drift przy aktualizacji raportu',
+    'Top-k zwraca fragmenty bez kontekstu sekcji',
+    'Brak proweniencji — nie wiadomo ze której strony',
+    'Re-indexing po każdej aktualizacji dokumentu',
+  ].map(t => `<li>${t}</li>`).join('');
+
+  document.getElementById('goodVerdict').innerHTML = [
+    'Nawigacja po drzewie zachowuje strukturę dokumentu',
+    'Zero embeddings — zero embedding drift',
+    'LLM wybiera sekcje rozumowaniem, nie similarity',
+    'Dokładna proweniencja: sekcja + numer strony',
+    'Drzewo budowane raz — aktualizacja tylko przy zmianach',
+  ].map(t => `<li>${t}</li>`).join('');
+
+  document.getElementById('verdictSection').style.display = 'grid';
+}
+
+async function runBad(data) {
+  let html = '';
+  const col = document.getElementById('badCol');
+
+  // Step 1: chunking
+  col.innerHTML = thinking('Chunking dokumentu (800 tokenów)...');
+  await delay(900);
+
+  const chunkCount = 47 + Math.floor(Math.random() * 12);
+  html += `<div class="step">
+    <div class="step-label">Krok 1 — Chunking + Embeddingi</div>
+    <div class="step-content">
+      <div class="chunks">
+        ${data.badChunks.map((c,i) => `
+          <div class="chunk">
+            <div class="chunk-label">Chunk #${Math.floor(Math.random()*40)+1} · ${780+Math.floor(Math.random()*100)} tokenów</div>
+            <div class="chunk-text ${c.relevant ? '' : 'chunk-bad'}">${c.text}</div>
+          </div>
+        `).join('')}
+        <div style="font-size:11px; color:rgba(239,68,68,.5); padding:4px 0;">
+          ...i jeszcze ${chunkCount - 5} chunków — granice sekcji ignorowane
+        </div>
+      </div>
+    </div>
+  </div>`;
+  col.innerHTML = html + thinking('Wyszukiwanie wektorowe (cosine similarity)...');
+  await delay(1100);
+
+  // Step 2: vector search
+  html += `<div class="step">
+    <div class="step-label">Krok 2 — Atlas Vector Search (cosine similarity)</div>
+    <div class="step-content">
+      <div class="vectors">
+        ${data.badChunks.map(c => `
+          <div class="vector-item">
+            <span class="vector-score ${c.score > 0.68 ? 'score-high' : c.score > 0.58 ? 'score-mid' : 'score-low'}">${c.score.toFixed(2)}</span>
+            <span class="vector-text">${c.text.slice(0,65)}...</span>
+          </div>
+        `).join('')}
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:rgba(239,68,68,.5);">
+        Top-5 chunków — ${data.badProblem}
+      </div>
+    </div>
+  </div>`;
+  col.innerHTML = html + thinking('Generowanie odpowiedzi...');
+  await delay(1300);
+
+  // Step 3: answer
+  html += `<div class="step">
+    <div class="step-label">Krok 3 — Odpowiedź LLM</div>
+  </div>
+  <div class="answer-box bad-answer">
+    <p>${data.badAnswer}</p>
+    <p style="margin-top:10px; font-size:11px; color:rgba(239,68,68,.45);">
+      Brak proweniencji · Niepełne dane · Nie wiadomo ze której strony pochodzi informacja
+    </p>
+  </div>`;
+  col.innerHTML = html;
+}
+
+async function runGood(data) {
+  let html = '';
+  const col = document.getElementById('goodCol');
+
+  // Step 1: build tree
+  col.innerHTML = thinking('Budowanie hierarchicznego drzewa dokumentu...');
+  await delay(700);
+
+  const allSections = Object.keys(DOC_TREE);
+  const treeLines = allSections.map(s => {
+    const level = s.match(/^\d+\.\d+/) ? 1 : 0;
+    const indent = level ? '  └─ ' : '';
+    const isSection = data.goodSections.some(gs => s.startsWith(gs.split('.')[0]));
+    return { line: `${indent}${s}`, selected: data.goodSections.includes(s), dim: !isSection && level === 0 };
+  });
+
+  html += `<div class="step">
+    <div class="step-label">Krok 1 — Hierarchiczne drzewo (ToC)</div>
+    <div class="step-content">
+      <div class="tree">
+        ${treeLines.map(t => `<div class="tree-node ${t.selected ? 'selected tree-scanning' : t.dim ? 'dim-node' : ''}">${t.line}</div>`).join('')}
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:rgba(16,185,129,.6);">
+        Zero embeddings · Zero vector index · Drzewo zbudowane raz
+      </div>
+    </div>
+  </div>`;
+  col.innerHTML = html + thinking('LLM nawiguje po spisie treści...');
+  await delay(1200);
+
+  // Remove scanning animation
+  html = html.replace(/tree-scanning/g, '');
+
+  // Step 2: reasoning
+  html += `<div class="step">
+    <div class="step-label">Krok 2 — LLM reasoning po ToC (nie similarity)</div>
+    <div class="step-content">
+      <div style="font-size:12px; color:var(--dim); background:rgba(16,185,129,.05); border:1px solid rgba(16,185,129,.15); border-radius:8px; padding:10px 14px; line-height:1.7;">
+        Model wybrał sekcje rozumowaniem:<br>
+        ${data.goodSections.map(s => `<span class="badge badge-green">${s}</span>`).join(' ')}
+        <br><br>
+        <span style="font-size:11px; opacity:.7;">Pominięto ${allSections.length - data.goodSections.length} nieistotnych sekcji · Zero token waste</span>
+      </div>
+    </div>
+  </div>`;
+  col.innerHTML = html + thinking('Generowanie odpowiedzi z proweniencją...');
+  await delay(1100);
+
+  // Step 3: answer
+  const formattedAnswer = data.goodAnswer
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n\n/g, '</p><p style="margin-top:8px;">')
+    .replace(/\n/g, '<br>');
+
+  html += `<div class="step">
+    <div class="step-label">Krok 3 — Odpowiedź z proweniencją</div>
+  </div>
+  <div class="answer-box good-answer">
+    <p>${formattedAnswer}</p>
+    <div class="provenance">
+      Źródła:
+      ${data.goodProvenance.map(p => `<span>→ ${p}</span>`).join('')}
+    </div>
+  </div>`;
+  col.innerHTML = html;
+}
+</script>
+</body>
+</html>
