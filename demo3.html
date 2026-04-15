@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo: OmegaWiki — Knowledge Graph</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2128;
+    --accent: #58a6ff; --accent2: #1f6feb;
+    --good: #3fb950; --amber: #d29922; --purple: #bc8cff;
+    --red: #f85149; --teal: #39d353; --orange: #ffa657;
+    --text: #e6edf3; --dim: #8b949e; --border: rgba(255,255,255,.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  header {
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    padding:22px 36px 18px;
+  }
+  header .badge {
+    display:inline-block; background:rgba(188,140,255,.15); color:var(--purple);
+    font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    padding:3px 12px; border-radius:20px; margin-bottom:10px; border:1px solid rgba(188,140,255,.25);
+  }
+  header h1 { font-size:20px; font-weight:800; color:var(--text); margin-bottom:4px; }
+  header p { font-size:13px; color:var(--dim); }
+
+  .layout { display:grid; grid-template-columns:1fr 340px; gap:0; height:calc(100vh - 85px); }
+
+  /* GRAPH CANVAS */
+  .graph-area {
+    position:relative; overflow:hidden; background:var(--bg);
+    border-right:1px solid var(--border);
+  }
+  #graphCanvas { width:100%; height:100%; }
+
+  /* LEGEND */
+  .legend {
+    position:absolute; top:16px; left:16px;
+    background:rgba(13,17,23,.85); border:1px solid var(--border);
+    border-radius:10px; padding:12px 16px; backdrop-filter:blur(8px);
+  }
+  .legend-title { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:8px; }
+  .legend-item { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); margin-bottom:4px; }
+  .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  /* STATS BAR */
+  .stats-bar {
+    position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+    display:flex; gap:20px; background:rgba(13,17,23,.85);
+    border:1px solid var(--border); border-radius:10px; padding:10px 20px;
+    backdrop-filter:blur(8px);
+  }
+  .stat-item { text-align:center; }
+  .stat-num { font-size:20px; font-weight:800; color:var(--accent); }
+  .stat-label { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; }
+
+  /* SIDEBAR */
+  .sidebar { background:var(--bg2); display:flex; flex-direction:column; overflow:hidden; }
+
+  .sidebar-tabs { display:flex; border-bottom:1px solid var(--border); }
+  .tab {
+    flex:1; padding:12px 8px; font-size:12px; font-weight:600; text-align:center;
+    cursor:pointer; color:var(--dim); border-bottom:2px solid transparent;
+    transition:all .15s;
+  }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+  .tab-content { display:none; flex-direction:column; gap:0; overflow-y:auto; flex:1; }
+  .tab-content.active { display:flex; }
+
+  .section { padding:16px; border-bottom:1px solid var(--border); }
+  .section-label {
+    font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    color:var(--dim); margin-bottom:10px;
+  }
+
+  /* BUTTONS */
+  .btn {
+    width:100%; padding:10px 14px; border-radius:8px; border:none;
+    font-size:13px; font-weight:600; cursor:pointer; transition:opacity .15s;
+    margin-bottom:6px; text-align:left; display:flex; align-items:center; gap:8px;
+  }
+  .btn:hover { opacity:.8; }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+  .btn-blue  { background:rgba(88,166,255,.15); color:var(--accent); border:1px solid rgba(88,166,255,.25); }
+  .btn-green { background:rgba(63,185,80,.15);  color:var(--good);   border:1px solid rgba(63,185,80,.25); }
+  .btn-amber { background:rgba(210,153,34,.15); color:var(--amber);  border:1px solid rgba(210,153,34,.25); }
+  .btn-red   { background:rgba(248,81,73,.15);  color:var(--red);    border:1px solid rgba(248,81,73,.25); }
+  .btn-purple{ background:rgba(188,140,255,.15);color:var(--purple); border:1px solid rgba(188,140,255,.25); }
+  .btn-icon { font-size:15px; flex-shrink:0; }
+
+  /* LOG */
+  .log { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:6px; }
+  .log-entry {
+    font-size:12px; line-height:1.5; padding:8px 10px;
+    border-radius:6px; border-left:2px solid;
+    animation:slideIn .3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  .log-entry.info  { background:rgba(88,166,255,.08);  border-color:var(--accent); color:var(--dim); }
+  .log-entry.good  { background:rgba(63,185,80,.08);   border-color:var(--good);   color:var(--dim); }
+  .log-entry.warn  { background:rgba(210,153,34,.08);  border-color:var(--amber);  color:var(--dim); }
+  .log-entry.bad   { background:rgba(248,81,73,.08);   border-color:var(--red);    color:var(--dim); }
+  .log-entry strong { color:var(--text); }
+
+  /* QUERY */
+  .query-input {
+    width:100%; background:var(--bg3); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px; color:var(--text); font-size:13px;
+    outline:none; resize:none; margin-bottom:8px;
+  }
+  .query-input:focus { border-color:var(--accent); }
+  .preset-q {
+    font-size:11px; color:var(--dim); padding:5px 10px; border-radius:6px;
+    border:1px solid var(--border); cursor:pointer; margin-bottom:5px;
+    display:block; background:var(--bg3); transition:border-color .15s;
+  }
+  .preset-q:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* QUERY RESULT */
+  .query-result {
+    margin:0 16px 16px; padding:12px 14px; border-radius:8px;
+    font-size:13px; line-height:1.6;
+    background:rgba(63,185,80,.06); border:1px solid rgba(63,185,80,.2);
+    display:none;
+  }
+  .query-result .answer { color:var(--text); margin-bottom:8px; }
+  .query-result .prov {
+    font-size:11px; color:rgba(63,185,80,.6); font-family:monospace;
+    border-top:1px solid rgba(63,185,80,.15); padding-top:8px;
+  }
+
+  /* BADGE */
+  .badge { display:inline-block; padding:1px 7px; border-radius:4px; font-size:10px; font-weight:700; margin:1px; }
+  .b-paper   { background:rgba(88,166,255,.2);  color:var(--accent); }
+  .b-concept { background:rgba(63,185,80,.2);   color:var(--good); }
+  .b-claim   { background:rgba(210,153,34,.2);  color:var(--amber); }
+  .b-person  { background:rgba(255,166,87,.2);  color:var(--orange); }
+  .b-exp     { background:rgba(188,140,255,.2); color:var(--purple); }
+  .b-topic   { background:rgba(57,211,83,.2);   color:var(--teal); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Demo #3 · Softkraft</div>
+  <h1>OmegaWiki — Knowledge Graph: wiedza która narasta</h1>
+  <p>9 typów encji · 9 typów relacji · Ingest / Query / Lint · wiedza kumuluje się zamiast znikać</p>
+</header>
+
+<div class="layout">
+
+  <!-- GRAPH -->
+  <div class="graph-area">
+    <canvas id="graphCanvas"></canvas>
+    <div class="legend">
+      <div class="legend-title">Typy encji</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>Paper</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div>Concept</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>Claim</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ffa657"></div>Person</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#bc8cff"></div>Experiment</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#39d353"></div>Topic</div>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-item"><div class="stat-num" id="statNodes">0</div><div class="stat-label">Węzły</div></div>
+      <div class="stat-item"><div class="stat-num" id="statEdges">0</div><div class="stat-label">Relacje</div></div>
+      <div class="stat-item"><div class="stat-num" id="statPapers">0</div><div class="stat-label">Papers</div></div>
+      <div class="stat-item"><div class="stat-num" id="statClaims">0</div><div class="stat-label">Claims</div></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="tab active" onclick="showTab('ingest')">Ingest</div>
+      <div class="tab" onclick="showTab('query')">Query</div>
+      <div class="tab" onclick="showTab('lint')">Lint</div>
+    </div>
+
+    <!-- INGEST TAB -->
+    <div class="tab-content active" id="tab-ingest">
+      <div class="section">
+        <div class="section-label">Dodaj do wiki</div>
+        <button class="btn btn-blue" onclick="ingest('attention')" id="btn-attention">
+          <span class="btn-icon">📄</span><div><div>Attention Is All You Need</div><div style="font-size:10px;opacity:.6;">Vaswani et al. · transformers, self-attention</div></div>
+        </button>
+        <button class="btn btn-blue" onclick="ingest('rag')" id="btn-rag">
+          <span class="btn-icon">📄</span><div><div>Dense Passage Retrieval (DPR)</div><div style="font-size:10px;opacity:.6;">Karpukhin et al. · embeddings, vector search</div></div>
+        </button>
+        <button class="btn btn-blue" onclick="ingest('pageindex')" id="btn-pageindex">
+          <span class="btn-icon">📄</span><div><div>PageIndex — Tree-based Retrieval</div><div style="font-size:10px;opacity:.6;">GitHub 24k★ · vectorless, reasoning</div></div>
+        </button>
+        <button class="btn btn-blue" onclick="ingest('karpathy')" id="btn-karpathy">
+          <span class="btn-icon">📄</span><div><div>Karpathy — LLM Wiki Pattern</div><div style="font-size:10px;opacity:.6;">Ingest/Query/Lint · knowledge accumulation</div></div>
+        </button>
+        <button class="btn btn-blue" onclick="ingest('omegawiki')" id="btn-omegawiki">
+          <span class="btn-icon">📄</span><div><div>OmegaWiki — 9 entities, 9 relations</div><div style="font-size:10px;opacity:.6;">skyllwt · production implementation</div></div>
+        </button>
+      </div>
+      <div class="log" id="ingestLog">
+        <div class="log-entry info"><strong>Wiki gotowa.</strong> Dodaj pierwsze papiery żeby zbudować graf wiedzy.</div>
+      </div>
+    </div>
+
+    <!-- QUERY TAB -->
+    <div class="tab-content" id="tab-query">
+      <div class="section">
+        <div class="section-label">Zadaj pytanie</div>
+        <span class="preset-q" onclick="setQuery('Jakie są alternatywy dla vector search?')">Alternatywy dla vector search?</span>
+        <span class="preset-q" onclick="setQuery('Kto pracował nad mechanizmem uwagi?')">Kto pracował nad attention?</span>
+        <span class="preset-q" onclick="setQuery('Które twierdzenia są sprzeczne?')">Sprzeczne twierdzenia?</span>
+        <span class="preset-q" onclick="setQuery('Jak działa Ingest/Query/Lint?')">Ingest/Query/Lint pattern?</span>
+        <textarea class="query-input" id="queryInput" rows="2">Jakie są alternatywy dla vector search?</textarea>
+        <button class="btn btn-green" onclick="runQuery()"><span class="btn-icon">→</span>Wykonaj query po grafie</button>
+      </div>
+      <div class="query-result" id="queryResult">
+        <div class="answer" id="queryAnswer"></div>
+        <div class="prov" id="queryProv"></div>
+      </div>
+      <div class="log" id="queryLog">
+        <div class="log-entry info">Najpierw dodaj kilka papers w zakładce Ingest.</div>
+      </div>
+    </div>
+
+    <!-- LINT TAB -->
+    <div class="tab-content" id="tab-lint">
+      <div class="section">
+        <div class="section-label">Health check wiki</div>
+        <button class="btn btn-amber" onclick="runLint('contradictions')"><span class="btn-icon">⚡</span>Sprawdź sprzeczności</button>
+        <button class="btn btn-amber" onclick="runLint('orphans')"><span class="btn-icon">◎</span>Znajdź orphan nodes</button>
+        <button class="btn btn-amber" onclick="runLint('gaps')"><span class="btn-icon">△</span>Wykryj luki wiedzy</button>
+        <button class="btn btn-red"   onclick="runLint('stale')"><span class="btn-icon">⏱</span>Stale claims (>6 mies.)</button>
+        <button class="btn btn-purple" onclick="runLint('all')"><span class="btn-icon">✦</span>Pełny lint</button>
+      </div>
+      <div class="log" id="lintLog">
+        <div class="log-entry info">Dodaj papers, a następnie uruchom lint aby sprawdzić jakość wiki.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── GRAPH ENGINE ────────────────────────────────────────────────
+const canvas = document.getElementById('graphCanvas');
+const ctx = canvas.getContext('2d');
+
+const COLORS = {
+  paper:   '#58a6ff', concept: '#3fb950', claim:   '#d29922',
+  person:  '#ffa657', experiment:'#bc8cff', topic: '#39d353', idea:'#ff7b72'
+};
+
+let nodes = [], edges = [], highlighted = new Set(), queryPath = [];
+let animFrame;
+
+function resize() {
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── INITIAL GRAPH ───────────────────────────────────────────────
+function initGraph() {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  nodes = [
+    { id:'rag_topic',    label:'RAG',              type:'topic',   x:cx,      y:cy,      r:22, fixed:true },
+    { id:'retrieval',    label:'Retrieval',         type:'concept', x:cx-160,  y:cy-80,   r:16 },
+    { id:'generation',   label:'Generation',        type:'concept', x:cx+160,  y:cy-80,   r:16 },
+    { id:'embeddings',   label:'Embeddings',        type:'concept', x:cx-200,  y:cy+60,   r:14 },
+    { id:'vectordb',     label:'Vector DB',         type:'concept', x:cx-80,   y:cy+140,  r:14 },
+    { id:'chunking',     label:'Chunking',          type:'concept', x:cx+100,  y:cy+130,  r:14 },
+    { id:'claim_chunk',  label:'Chunking niszczy\nstrukturę',  type:'claim', x:cx+240, y:cy+60, r:13 },
+    { id:'claim_vector', label:'Vector search\nskaluje się',   type:'claim', x:cx-260, y:cy-20, r:13 },
+  ];
+  edges = [
+    { from:'rag_topic', to:'retrieval',   label:'uses' },
+    { from:'rag_topic', to:'generation',  label:'uses' },
+    { from:'retrieval', to:'embeddings',  label:'requires' },
+    { from:'retrieval', to:'vectordb',    label:'stores_in' },
+    { from:'retrieval', to:'chunking',    label:'uses' },
+    { from:'chunking',  to:'claim_chunk', label:'tested_by' },
+    { from:'vectordb',  to:'claim_vector',label:'supports' },
+  ];
+  updateStats();
+  render();
+}
+
+// ─── INGEST DATA ─────────────────────────────────────────────────
+const PAPERS = {
+  attention: {
+    nodes: [
+      { id:'p_attention', label:'Attention Is\nAll You Need', type:'paper',   r:18 },
+      { id:'transformers',label:'Transformers',               type:'concept', r:16 },
+      { id:'self_attn',   label:'Self-Attention',             type:'concept', r:14 },
+      { id:'vaswani',     label:'Vaswani et al.',             type:'person',  r:13 },
+      { id:'claim_attn',  label:'Attention > RNN\ndla NLP',  type:'claim',   r:12 },
+    ],
+    edges: [
+      { from:'p_attention', to:'transformers', label:'introduces' },
+      { from:'p_attention', to:'self_attn',    label:'introduces' },
+      { from:'p_attention', to:'vaswani',      label:'authored_by' },
+      { from:'transformers',to:'generation',   label:'enables' },
+      { from:'self_attn',   to:'claim_attn',   label:'supports' },
+      { from:'transformers',to:'embeddings',   label:'extends' },
+    ],
+    log: [
+      { type:'good', msg:'<strong>Nowy paper:</strong> Attention Is All You Need → węzły: Transformers, Self-Attention, Vaswani et al.' },
+      { type:'info', msg:'Relacja <strong>extends</strong> → Transformers ↔ Embeddings (połączono z istniejącym węzłem)' },
+      { type:'good', msg:'Nowy claim: <strong>"Attention > RNN dla NLP"</strong> — zapisano w wiki' },
+    ]
+  },
+  rag: {
+    nodes: [
+      { id:'p_dpr',      label:'Dense Passage\nRetrieval',    type:'paper',   r:18 },
+      { id:'karpukhin',  label:'Karpukhin et al.',            type:'person',  r:13 },
+      { id:'faiss',      label:'FAISS Index',                 type:'concept', r:14 },
+      { id:'exp_dpr',    label:'DPR benchmark\nNQ/TriviaQA', type:'experiment',r:13 },
+      { id:'claim_dpr',  label:'Dense > sparse\nretrieval',  type:'claim',   r:12 },
+    ],
+    edges: [
+      { from:'p_dpr',    to:'karpukhin',  label:'authored_by' },
+      { from:'p_dpr',    to:'faiss',      label:'uses' },
+      { from:'p_dpr',    to:'embeddings', label:'extends' },
+      { from:'p_dpr',    to:'vectordb',   label:'stores_in' },
+      { from:'p_dpr',    to:'exp_dpr',    label:'tested_by' },
+      { from:'exp_dpr',  to:'claim_dpr',  label:'supports' },
+      { from:'claim_dpr',to:'retrieval',  label:'addresses_gap' },
+    ],
+    log: [
+      { type:'good', msg:'<strong>Nowy paper:</strong> Dense Passage Retrieval → FAISS Index, benchmark NQ/TriviaQA' },
+      { type:'info', msg:'Relacja <strong>extends</strong> → DPR ↔ Embeddings (istniejący węzeł)' },
+      { type:'warn', msg:'Potencjalny konflikt: claim "Vector search skaluje się" vs nowe ograniczenia DPR przy scale' },
+    ]
+  },
+  pageindex: {
+    nodes: [
+      { id:'p_pageindex',  label:'PageIndex',                type:'paper',   r:18 },
+      { id:'tree_ret',     label:'Tree-based\nRetrieval',    type:'concept', r:16 },
+      { id:'toc_nav',      label:'ToC Navigation',           type:'concept', r:14 },
+      { id:'vectorless',   label:'Vectorless\nSearch',       type:'concept', r:15 },
+      { id:'claim_tree',   label:'Tree > chunking\ndla PDF', type:'claim',   r:13 },
+      { id:'claim_no_vec', label:'Zero embeddings\nmożliwe', type:'claim',   r:13 },
+    ],
+    edges: [
+      { from:'p_pageindex', to:'tree_ret',     label:'introduces' },
+      { from:'p_pageindex', to:'toc_nav',      label:'uses' },
+      { from:'p_pageindex', to:'vectorless',   label:'introduces' },
+      { from:'tree_ret',    to:'chunking',      label:'supersedes' },
+      { from:'vectorless',  to:'vectordb',      label:'contradicts' },
+      { from:'vectorless',  to:'embeddings',    label:'contradicts' },
+      { from:'tree_ret',    to:'claim_tree',    label:'supports' },
+      { from:'vectorless',  to:'claim_no_vec',  label:'supports' },
+      { from:'claim_tree',  to:'claim_chunk',   label:'supports' },
+      { from:'claim_no_vec',to:'claim_vector',  label:'contradicts' },
+    ],
+    log: [
+      { type:'good', msg:'<strong>Nowy paper:</strong> PageIndex → Tree-based Retrieval, Vectorless Search' },
+      { type:'bad',  msg:'Wykryto <strong>sprzeczność</strong>: "Vectorless" ↔ "Vector search skaluje się" — flagowano do review' },
+      { type:'good', msg:'Nowy claim: <strong>"Tree > chunking dla PDF"</strong> wspiera istniejące: "Chunking niszczy strukturę"' },
+    ]
+  },
+  karpathy: {
+    nodes: [
+      { id:'p_karpathy',  label:'Karpathy LLM\nWiki Pattern',  type:'paper',   r:18 },
+      { id:'karpathy_p',  label:'Andrej Karpathy',             type:'person',  r:13 },
+      { id:'knowledge_acc',label:'Knowledge\nAccumulation',    type:'concept', r:15 },
+      { id:'provenance',  label:'Provenance',                  type:'concept', r:14 },
+      { id:'raw_layer',   label:'raw/ layer',                  type:'concept', r:13 },
+      { id:'idea_wiki',   label:'Idea: wiki zamiast\njed. odpowiedzi', type:'idea', r:13 },
+    ],
+    edges: [
+      { from:'p_karpathy',   to:'karpathy_p',    label:'authored_by' },
+      { from:'p_karpathy',   to:'knowledge_acc',  label:'introduces' },
+      { from:'p_karpathy',   to:'provenance',     label:'requires' },
+      { from:'p_karpathy',   to:'raw_layer',      label:'introduces' },
+      { from:'p_karpathy',   to:'idea_wiki',      label:'inspired_by' },
+      { from:'knowledge_acc',to:'retrieval',       label:'extends' },
+      { from:'raw_layer',    to:'vectordb',        label:'replaces' },
+      { from:'provenance',   to:'claim_tree',      label:'supports' },
+      { from:'idea_wiki',    to:'tree_ret',        label:'extends' },
+    ],
+    log: [
+      { type:'good', msg:'<strong>Nowy paper:</strong> Karpathy LLM Wiki → Knowledge Accumulation, raw/ layer, Provenance' },
+      { type:'info', msg:'Połączono: raw/ layer ↔ Vector DB (<strong>replaces</strong>)' },
+      { type:'good', msg:'Nowa idea: <strong>"Wiki zamiast jednorazowych odpowiedzi"</strong> — extends Tree-based Retrieval' },
+    ]
+  },
+  omegawiki: {
+    nodes: [
+      { id:'p_omega',     label:'OmegaWiki',               type:'paper',   r:20 },
+      { id:'kg',          label:'Knowledge Graph',          type:'concept', r:16 },
+      { id:'entity_types',label:'9 Entity Types',           type:'concept', r:14 },
+      { id:'rel_types',   label:'9 Relation Types',         type:'concept', r:14 },
+      { id:'arxiv_int',   label:'arXiv Integration',        type:'concept', r:13 },
+      { id:'exp_omega',   label:'2263 testy\nprzeszły',    type:'experiment',r:13 },
+      { id:'claim_omega', label:'Wiedza narasta\nnie ginie',type:'claim',   r:14 },
+    ],
+    edges: [
+      { from:'p_omega',     to:'kg',          label:'implements' },
+      { from:'p_omega',     to:'entity_types',label:'defines' },
+      { from:'p_omega',     to:'rel_types',   label:'defines' },
+      { from:'p_omega',     to:'arxiv_int',   label:'uses' },
+      { from:'p_omega',     to:'exp_omega',   label:'tested_by' },
+      { from:'kg',          to:'knowledge_acc',label:'extends' },
+      { from:'kg',          to:'provenance',  label:'ensures' },
+      { from:'kg',          to:'tree_ret',    label:'extends' },
+      { from:'entity_types',to:'claim_omega', label:'supports' },
+      { from:'claim_omega', to:'knowledge_acc',label:'supports' },
+      { from:'p_omega',     to:'p_karpathy',  label:'inspired_by' },
+    ],
+    log: [
+      { type:'good', msg:'<strong>Nowy paper:</strong> OmegaWiki → Knowledge Graph, 9 entity types, 9 relation types' },
+      { type:'good', msg:'Relacja <strong>inspired_by</strong> → OmegaWiki ← Karpathy LLM Wiki' },
+      { type:'good', msg:'Relacja <strong>extends</strong> → Knowledge Graph ↔ Tree-based Retrieval' },
+      { type:'good', msg:'Eksperyment: <strong>2263 testy przeszły</strong> — claim "Wiedza narasta" potwierdzony' },
+    ]
+  }
+};
+
+// ─── PHYSICS LAYOUT ─────────────────────────────────────────────
+function placeNewNode(node) {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 180 + Math.random() * 140;
+  node.x = cx + Math.cos(angle) * dist;
+  node.y = cy + Math.sin(angle) * dist;
+  node.vx = 0; node.vy = 0;
+  node.alpha = 0;
+}
+
+function physics() {
+  const repulsion = 2200, spring = 0.025, damping = 0.85, centerForce = 0.004;
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[i];
+    if (a.fixed) continue;
+    if (!a.vx) a.vx = 0;
+    if (!a.vy) a.vy = 0;
+
+    // Center gravity
+    a.vx += (cx - a.x) * centerForce;
+    a.vy += (cy - a.y) * centerForce;
+
+    // Repulsion
+    for (let j = 0; j < nodes.length; j++) {
+      if (i === j) continue;
+      const b = nodes[j];
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const force = repulsion / (dist * dist);
+      a.vx += (dx / dist) * force;
+      a.vy += (dy / dist) * force;
+    }
+
+    // Spring (edges)
+    for (const e of edges) {
+      let other = null;
+      if (e.from === a.id) other = nodes.find(n => n.id === e.to);
+      if (e.to   === a.id) other = nodes.find(n => n.id === e.from);
+      if (!other) continue;
+      const dx = other.x - a.x, dy = other.y - a.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const target = 120;
+      const force = (dist - target) * spring;
+      a.vx += (dx / dist) * force;
+      a.vy += (dy / dist) * force;
+    }
+
+    a.vx *= damping; a.vy *= damping;
+    a.x += a.vx; a.y += a.vy;
+
+    // Bounds
+    const margin = 60;
+    a.x = Math.max(margin, Math.min(canvas.width - margin, a.x));
+    a.y = Math.max(margin, Math.min(canvas.height - margin, a.y));
+  }
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────
+function render() {
+  cancelAnimationFrame(animFrame);
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    physics();
+
+    // Fade in new nodes
+    for (const n of nodes) {
+      if (n.alpha < 1) n.alpha = Math.min(1, (n.alpha || 0) + 0.04);
+    }
+
+    // Edges
+    for (const e of edges) {
+      const a = nodes.find(n => n.id === e.from);
+      const b = nodes.find(n => n.id === e.to);
+      if (!a || !b) continue;
+      const alpha = Math.min(a.alpha || 1, b.alpha || 1);
+      const isHighlighted = highlighted.has(e.from) && highlighted.has(e.to);
+      const isQuery = queryPath.includes(e.from + '->' + e.to) || queryPath.includes(e.to + '->' + e.from);
+
+      ctx.save();
+      ctx.globalAlpha = alpha * (isQuery ? 1 : isHighlighted ? 0.8 : 0.25);
+      ctx.strokeStyle = isQuery ? '#3fb950' : isHighlighted ? '#58a6ff' : '#8b949e';
+      ctx.lineWidth = isQuery ? 2.5 : isHighlighted ? 2 : 1;
+      if (!isQuery && !isHighlighted) ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Edge label
+      if (isQuery || isHighlighted) {
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        ctx.font = '9px monospace';
+        ctx.fillStyle = isQuery ? '#3fb950' : '#58a6ff';
+        ctx.textAlign = 'center';
+        ctx.fillText(e.label, mx, my - 4);
+      }
+      ctx.restore();
+    }
+
+    // Nodes
+    for (const n of nodes) {
+      const isHighlight = highlighted.has(n.id);
+      const isQuery = queryPath.includes(n.id);
+      const alpha = n.alpha || 1;
+      const color = COLORS[n.type] || '#8b949e';
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // Glow
+      if (isQuery) {
+        ctx.shadowColor = '#3fb950'; ctx.shadowBlur = 20;
+      } else if (isHighlight) {
+        ctx.shadowColor = color; ctx.shadowBlur = 14;
+      }
+
+      // Circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = isQuery ? '#3fb950' : color + (isHighlight ? 'ff' : '33');
+      ctx.fill();
+      ctx.strokeStyle = isQuery ? '#3fb950' : color;
+      ctx.lineWidth = isHighlight || isQuery ? 2 : 1;
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+
+      // Label
+      ctx.font = `bold ${Math.max(9, n.r * 0.55)}px 'Segoe UI', sans-serif`;
+      ctx.fillStyle = isQuery ? '#0d1117' : (isHighlight ? color : '#8b949e');
+      ctx.textAlign = 'center';
+      const lines = n.label.split('\n');
+      const lineH = 12;
+      const startY = n.y - (lines.length - 1) * lineH / 2;
+      lines.forEach((line, i) => ctx.fillText(line, n.x, startY + i * lineH + 3));
+
+      ctx.restore();
+    }
+
+    animFrame = requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+// ─── INGEST ──────────────────────────────────────────────────────
+async function ingest(paperId) {
+  const paper = PAPERS[paperId];
+  if (!paper) return;
+  const btn = document.getElementById('btn-' + paperId);
+  if (btn) { btn.disabled = true; btn.style.opacity = '.4'; }
+
+  const existingIds = new Set(nodes.map(n => n.id));
+  for (const n of paper.nodes) {
+    if (!existingIds.has(n.id)) {
+      placeNewNode(n);
+      nodes.push(n);
+      await sleep(120);
+    }
+  }
+  for (const e of paper.edges) {
+    if (!edges.find(ex => ex.from === e.from && ex.to === e.to)) {
+      edges.push(e);
+    }
+  }
+
+  // Highlight new nodes
+  highlighted = new Set(paper.nodes.map(n => n.id));
+  setTimeout(() => { highlighted = new Set(); }, 3000);
+
+  for (const log of paper.log) {
+    addLog('ingestLog', log.type, log.msg);
+    await sleep(300);
+  }
+  addLog('ingestLog', 'info', `Graf: <strong>${nodes.length} węzłów</strong>, <strong>${edges.length} relacji</strong>`);
+  updateStats();
+}
+
+// ─── QUERY ───────────────────────────────────────────────────────
+const QUERY_ANSWERS = {
+  'Jakie są alternatywy dla vector search?': {
+    path: ['vectordb','vectorless','tree_ret','toc_nav','p_pageindex','raw_layer'],
+    pathEdges: ['vectordb->vectorless','tree_ret->chunking','raw_layer->vectordb'],
+    answer: 'Graf wskazuje <strong>3 alternatywy</strong> dla Vector DB:<br><br>1. <strong>Tree-based Retrieval</strong> (PageIndex) — nawigacja po hierarchii dokumentu zamiast similarity<br>2. <strong>Vectorless Search</strong> — LLM reasoning po ToC, zero embeddings<br>3. <strong>raw/ layer</strong> (Karpathy) — surowe źródła jako niezmienne dane, bez indeksowania',
+    prov: ['§vectorless → contradicts → Vector DB', '§tree_ret → supersedes → chunking', '§raw_layer → replaces → Vector DB']
+  },
+  'Kto pracował nad mechanizmem uwagi?': {
+    path: ['p_attention','vaswani','self_attn','transformers'],
+    pathEdges: ['p_attention->vaswani','p_attention->self_attn','p_attention->transformers'],
+    answer: 'Mechanizm Self-Attention opisany przez <strong>Vaswani et al.</strong> w "Attention Is All You Need".<br><br>Paper wprowadził: <strong>Transformers</strong> (architektura), <strong>Self-Attention</strong> (mechanizm), claim: "Attention > RNN dla NLP".',
+    prov: ['§p_attention → authored_by → Vaswani et al.', '§p_attention → introduces → Self-Attention']
+  },
+  'Które twierdzenia są sprzeczne?': {
+    path: ['claim_vector','claim_no_vec','vectorless','vectordb'],
+    pathEdges: ['vectorless->vectordb','claim_no_vec->claim_vector'],
+    answer: 'Wiki zawiera <strong>aktywną sprzeczność</strong>:<br><br>→ "Vector search skaluje się" (DPR, claim_vector)<br>↔ <strong>contradicts</strong> ↔<br>← "Zero embeddings możliwe" (PageIndex, claim_no_vec)<br><br>Lint flagi: wymaga decyzji która claim jest aktualna w kontekście skali.',
+    prov: ['§claim_no_vec → contradicts → claim_vector', '§vectorless → contradicts → Vector DB']
+  },
+  'Jak działa Ingest/Query/Lint?': {
+    path: ['p_karpathy','knowledge_acc','provenance','raw_layer','idea_wiki'],
+    pathEdges: ['p_karpathy->knowledge_acc','p_karpathy->provenance','p_karpathy->raw_layer'],
+    answer: '<strong>Pattern Karpathy (LLM Wiki):</strong><br><br><strong>Ingest</strong> — LLM przetwarza źródła, aktualizuje węzły grafu, loguje zmiany<br><strong>Query</strong> — traverse po grafie, odpowiedź z proweniencją do węzłów<br><strong>Lint</strong> — health check: sprzeczności, orphan nodes, stale claims<br><br>raw/ = niezmienne źródła prawdy. Wiki = warstwa nawigacji.',
+    prov: ['§p_karpathy → introduces → Knowledge Accumulation', '§p_karpathy → requires → Provenance']
+  }
+};
+
+function setQuery(q) { document.getElementById('queryInput').value = q; }
+
+async function runQuery() {
+  const q = document.getElementById('queryInput').value.trim();
+  const data = QUERY_ANSWERS[q];
+  const logEl = document.getElementById('queryLog');
+  const resultEl = document.getElementById('queryResult');
+
+  if (nodes.length < 4) {
+    addLog('queryLog','warn','Dodaj najpierw kilka papers (zakładka Ingest).');
+    return;
+  }
+
+  resultEl.style.display = 'none';
+  queryPath = [];
+  addLog('queryLog','info',`Query: <strong>"${q}"</strong>`);
+  await sleep(400);
+  addLog('queryLog','info','Traversal grafu — szukam powiązanych węzłów...');
+  await sleep(600);
+
+  if (data) {
+    queryPath = data.path.filter(id => nodes.find(n=>n.id===id));
+    addLog('queryLog','good',`Znaleziono <strong>${queryPath.length} węzłów</strong> na ścieżce odpowiedzi`);
+    await sleep(400);
+
+    document.getElementById('queryAnswer').innerHTML = data.answer;
+    document.getElementById('queryProv').innerHTML = data.prov.map(p=>`<span>→ ${p}</span>`).join('');
+    resultEl.style.display = 'block';
+
+    setTimeout(() => { queryPath = []; }, 5000);
+  } else {
+    addLog('queryLog','warn','Pytanie poza zakresem obecnego grafu. Dodaj więcej papers.');
+  }
+}
+
+// ─── LINT ────────────────────────────────────────────────────────
+const LINT_RESULTS = {
+  contradictions: [
+    { type:'bad',  msg:'Sprzeczność: <strong>"Vector search skaluje się"</strong> ↔ <strong>"Zero embeddings możliwe"</strong> — wymaga rozstrzygnięcia' },
+    { type:'warn', msg:'Potencjalny konflikt: DPR zakłada dense retrieval, PageIndex go omija — różne domeny zastosowania' },
+  ],
+  orphans: [
+    { type:'warn', msg:'Orphan node: <strong>FAISS Index</strong> — brak połączeń wychodzących do claims lub experiments' },
+    { type:'info', msg:'Węzeł <strong>arXiv Integration</strong> — tylko 1 relacja wchodząca, rozważ rozbudowę' },
+  ],
+  gaps: [
+    { type:'warn', msg:'Luka: brak papers o <strong>hybrid RAG</strong> (vector + tree combined)' },
+    { type:'warn', msg:'Luka: brak danych o <strong>koszcie tokenów</strong> dla tree retrieval vs vector search' },
+    { type:'info', msg:'Sugestia: dodaj paper o <strong>GraphRAG (Microsoft)</strong> — addresses_gap dla Knowledge Graph' },
+  ],
+  stale: [
+    { type:'bad',  msg:'Stale: claim <strong>"Dense > sparse retrieval"</strong> — DPR z 2020, nowe modele mogą zmieniać balans' },
+    { type:'warn', msg:'Review: benchmark <strong>DPR NQ/TriviaQA</strong> — czy nadal SOTA? Dodaj nowsze experiments' },
+  ],
+};
+
+async function runLint(type) {
+  if (nodes.length < 4) {
+    addLog('lintLog','warn','Dodaj najpierw kilka papers żeby lint miał co sprawdzać.');
+    return;
+  }
+  addLog('lintLog','info',`Uruchamiam lint: <strong>${type}</strong>...`);
+  await sleep(600);
+
+  const results = type === 'all'
+    ? Object.values(LINT_RESULTS).flat()
+    : LINT_RESULTS[type] || [];
+
+  for (const r of results) {
+    addLog('lintLog', r.type, r.msg);
+    await sleep(250);
+  }
+  addLog('lintLog', 'info', `Lint zakończony — ${results.length} znalezisk`);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────
+function addLog(logId, type, msg) {
+  const log = document.getElementById(logId);
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.innerHTML = `<span style="font-size:10px;opacity:.5;">${new Date().toLocaleTimeString('pl')}</span> ${msg}`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+function updateStats() {
+  document.getElementById('statNodes').textContent  = nodes.length;
+  document.getElementById('statEdges').textContent  = edges.length;
+  document.getElementById('statPapers').textContent = nodes.filter(n=>n.type==='paper').length;
+  document.getElementById('statClaims').textContent = nodes.filter(n=>n.type==='claim').length;
+  setTimeout(updateStats, 1000);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['ingest','query','lint'][i] === name));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── INIT ────────────────────────────────────────────────────────
+initGraph();
+render();
+</script>
+</body>
+</html>
