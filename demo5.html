@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo: Cognitive Scaffolding — Zewnętrzna pamięć agenta</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #1c2128;
+    --accent: #58a6ff; --good: #3fb950; --amber: #d29922;
+    --purple: #bc8cff; --red: #f85149; --teal: #39d353;
+    --text: #e6edf3; --dim: #8b949e; --border: rgba(255,255,255,.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  header {
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    padding:20px 32px 16px; display:flex; align-items:center; gap:24px;
+  }
+  header .badge {
+    display:inline-block; background:rgba(63,185,80,.15); color:var(--good);
+    font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    padding:3px 12px; border-radius:20px; border:1px solid rgba(63,185,80,.25);
+  }
+  header h1 { font-size:19px; font-weight:800; margin-top:8px; }
+  header p { font-size:12px; color:var(--dim); margin-top:3px; }
+
+  /* ─── LAYOUT ─── */
+  .layout {
+    display:grid;
+    grid-template-columns:1fr 1fr 340px;
+    height:calc(100vh - 80px);
+    gap:0;
+  }
+
+  /* ─── AGENT LOG (left) ─── */
+  .agent-col {
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .col-header {
+    padding:12px 16px; border-bottom:1px solid var(--border);
+    font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    color:var(--dim); display:flex; align-items:center; justify-content:space-between;
+  }
+  .run-btn {
+    padding:5px 14px; border-radius:6px; border:1px solid rgba(88,166,255,.3);
+    background:rgba(88,166,255,.1); color:var(--accent); font-size:11px; font-weight:700;
+    cursor:pointer; transition:opacity .15s;
+  }
+  .run-btn:hover { opacity:.8; }
+
+  .scenario-row {
+    padding:10px 16px; border-bottom:1px solid var(--border);
+    display:flex; gap:6px; flex-wrap:wrap;
+  }
+  .sc-btn {
+    padding:4px 12px; border-radius:6px; border:1px solid var(--border);
+    background:var(--bg3); color:var(--dim); font-size:11px; font-weight:600;
+    cursor:pointer; transition:all .15s;
+  }
+  .sc-btn:hover { color:var(--text); border-color:var(--accent); }
+  .sc-btn.active { background:rgba(88,166,255,.1); border-color:var(--accent); color:var(--accent); }
+
+  .log { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+
+  .log-entry {
+    font-size:12px; line-height:1.55; padding:9px 12px;
+    border-radius:8px; border-left:3px solid; opacity:0; transform:translateX(-8px);
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .log-entry.show { opacity:1; transform:translateX(0); }
+  .log-entry.action { border-color:var(--accent);  background:rgba(88,166,255,.06); }
+  .log-entry.read   { border-color:var(--good);    background:rgba(63,185,80,.06); }
+  .log-entry.write  { border-color:var(--amber);   background:rgba(210,153,34,.06); }
+  .log-entry.warn   { border-color:var(--red);     background:rgba(248,81,73,.06); }
+  .log-entry.stale  { border-color:var(--purple);  background:rgba(188,140,255,.06); }
+  .log-entry.done   { border-color:var(--teal);    background:rgba(57,211,83,.06); }
+
+  .log-tag {
+    display:inline-block; font-size:9px; font-weight:800; letter-spacing:1.5px;
+    text-transform:uppercase; padding:1px 7px; border-radius:10px; margin-right:6px;
+  }
+  .tag-action { background:rgba(88,166,255,.2);  color:var(--accent); }
+  .tag-read   { background:rgba(63,185,80,.2);   color:var(--good); }
+  .tag-write  { background:rgba(210,153,34,.2);  color:var(--amber); }
+  .tag-warn   { background:rgba(248,81,73,.2);   color:var(--red); }
+  .tag-stale  { background:rgba(188,140,255,.2); color:var(--purple); }
+  .tag-done   { background:rgba(57,211,83,.2);   color:var(--teal); }
+
+  /* ─── FILE SYSTEM (middle) ─── */
+  .files-col {
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .files-area { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+
+  .file-card {
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:10px; overflow:hidden; transition:border-color .3s;
+  }
+  .file-card.flash-write { border-color:var(--amber); }
+  .file-card.flash-read  { border-color:var(--good); }
+
+  .file-header {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 14px; border-bottom:1px solid var(--border);
+    background:var(--bg3);
+  }
+  .file-dot { width:10px; height:10px; border-radius:50%; }
+  .file-name { font-size:12px; font-weight:700; font-family:monospace; }
+  .file-desc { font-size:11px; color:var(--dim); margin-left:auto; }
+
+  .file-body {
+    padding:12px 14px; font-size:11px; font-family:monospace;
+    line-height:1.7; color:var(--dim); min-height:80px;
+    white-space:pre-wrap; word-break:break-word;
+  }
+
+  .staleness-bar {
+    height:3px; background:var(--bg3); overflow:hidden;
+  }
+  .staleness-fill {
+    height:100%; background:var(--good); width:100%;
+    transition:width 1s linear, background .3s;
+  }
+  .staleness-fill.warn  { background:var(--amber); }
+  .staleness-fill.stale { background:var(--red); }
+
+  /* ─── RIGHT PANEL ─── */
+  .right-panel {
+    background:var(--bg2); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .stats-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:1px;
+    border-bottom:1px solid var(--border); background:var(--border);
+  }
+  .stat-cell { background:var(--bg2); padding:14px 16px; }
+  .stat-num { font-size:24px; font-weight:800; }
+  .stat-label { font-size:10px; color:var(--dim); margin-top:2px; }
+
+  .info-area { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+
+  .card {
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:10px; padding:14px;
+  }
+  .card h3 { font-size:12px; font-weight:700; margin-bottom:8px; }
+  .card p, .card li { font-size:12px; color:var(--dim); line-height:1.6; }
+  .card ul { padding-left:14px; display:flex; flex-direction:column; gap:4px; }
+
+  .verdict {
+    border-radius:10px; padding:14px; border:1px solid;
+    display:none;
+  }
+  .verdict.show { display:block; animation:fadeIn .4s ease; }
+  .verdict h3 { font-size:13px; font-weight:800; margin-bottom:6px; }
+  .verdict p  { font-size:12px; line-height:1.6; }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+  .progress-indicator {
+    display:flex; align-items:center; gap:8px; padding:8px 16px;
+    border-top:1px solid var(--border); font-size:11px; color:var(--dim);
+  }
+  .dot-pulse { width:8px; height:8px; border-radius:50%; background:var(--good); animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="badge">Cognitive Scaffolding · Demo</div>
+    <h1>Zewnętrzna pamięć agenta: plan.md / findings.md / progress.md</h1>
+    <p>Agent bez scaffoldingu dryfuje · Agent z plikami kognitvwnymi zostaje na torze</p>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ─── AGENT LOG ─── -->
+  <div class="agent-col">
+    <div class="col-header">
+      Log agenta
+      <button class="run-btn" id="runBtn" onclick="startRun()">Uruchom</button>
+    </div>
+    <div class="scenario-row">
+      <button class="sc-btn active" onclick="selectScenario(0)">Analiza konkurencji</button>
+      <button class="sc-btn" onclick="selectScenario(1)">Bez scaffoldingu (dryf)</button>
+      <button class="sc-btn" onclick="selectScenario(2)">Staleness check</button>
+    </div>
+    <div class="log" id="log"></div>
+    <div class="progress-indicator" id="progressBar" style="display:none;">
+      <div class="dot-pulse"></div>
+      <span id="progressText">Agent pracuje...</span>
+    </div>
+  </div>
+
+  <!-- ─── FILE SYSTEM ─── -->
+  <div class="files-col">
+    <div class="col-header">System plików kognitywnych</div>
+    <div class="files-area">
+
+      <div class="file-card" id="file-plan">
+        <div class="file-header">
+          <div class="file-dot" style="background:var(--accent);"></div>
+          <span class="file-name" style="color:var(--accent);">plan.md</span>
+          <span class="file-desc">Cele · Hipoteza · Decyzje</span>
+        </div>
+        <div class="staleness-bar"><div class="staleness-fill" id="stale-plan"></div></div>
+        <div class="file-body" id="body-plan">— plik pusty —</div>
+      </div>
+
+      <div class="file-card" id="file-findings">
+        <div class="file-header">
+          <div class="file-dot" style="background:var(--amber);"></div>
+          <span class="file-name" style="color:var(--amber);">findings.md</span>
+          <span class="file-desc">Odkrycia · Dowody</span>
+        </div>
+        <div class="staleness-bar"><div class="staleness-fill" id="stale-findings"></div></div>
+        <div class="file-body" id="body-findings">— plik pusty —</div>
+      </div>
+
+      <div class="file-card" id="file-progress">
+        <div class="file-header">
+          <div class="file-dot" style="background:var(--good);"></div>
+          <span class="file-name" style="color:var(--good);">progress.md</span>
+          <span class="file-desc">Kronika · Co wykonano</span>
+        </div>
+        <div class="staleness-bar"><div class="staleness-fill" id="stale-progress"></div></div>
+        <div class="file-body" id="body-progress">— plik pusty —</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── RIGHT PANEL ─── -->
+  <div class="right-panel">
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-num" id="s-reads" style="color:var(--good);">0</div>
+        <div class="stat-label">Odczyty plików</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num" id="s-writes" style="color:var(--amber);">0</div>
+        <div class="stat-label">Zapisy plików</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num" id="s-steps" style="color:var(--accent);">0</div>
+        <div class="stat-label">Kroki agenta</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num" id="s-staleness" style="color:var(--purple);">0</div>
+        <div class="stat-label">Staleness bloki</div>
+      </div>
+    </div>
+
+    <div class="info-area">
+      <div class="card">
+        <h3>Dlaczego to działa</h3>
+        <ul>
+          <li><strong>plan.md</strong> — agent czyta PRZED każdą ważną akcją, nie dryfuje od celu</li>
+          <li><strong>findings.md</strong> — odkrycia zapisywane od razu, nie giną po przesunięciu okna kontekstu</li>
+          <li><strong>progress.md</strong> — kronika działa jak pamięć epizodyczna</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Staleness check</h3>
+        <p>Jeśli plik nie był aktualizowany od N sekund — agent jest blokowany i musi go najpierw zaktualizować. Wymusza dyscyplinę zapisu.</p>
+      </div>
+
+      <div id="verdict-ok" class="verdict" style="background:rgba(63,185,80,.07); border-color:rgba(63,185,80,.3);">
+        <h3 style="color:var(--good);">Zadanie ukończone</h3>
+        <p>Agent pozostał na torze przez cały czas. Pliki kognitywne zapobiegły dryfowi.</p>
+      </div>
+      <div id="verdict-drift" class="verdict" style="background:rgba(248,81,73,.07); border-color:rgba(248,81,73,.3);">
+        <h3 style="color:var(--red);">Agent zdryfowal</h3>
+        <p>Bez zewnętrznej pamięci agent zapomniał pierwotny cel, powtórzył pracę i nie dostarczył wyniku.</p>
+      </div>
+      <div id="verdict-blocked" class="verdict" style="background:rgba(188,140,255,.07); border-color:rgba(188,140,255,.3);">
+        <h3 style="color:var(--purple);">Staleness check zadziałał</h3>
+        <p>Agent był blokowany gdy zbyt długo nie aktualizował pliku. Wymuszono zapis — pipeline wrócił na tor.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let reads=0, writes=0, steps=0, staleness=0;
+let running = false;
+let currentScenario = 0;
+
+const scenarios = [
+  // ── Scenariusz 0: z scaffoldingiem ──
+  [
+    { type:"write", file:"plan",     tag:"ZAPIS",   cls:"write",  text:"Tworzę plan.md\nCel: porównać Pinecone vs Weaviate vs Qdrant\nHipoteza: Qdrant lepszy dla dużych zbiorów\nKryterium: latencja p99, koszt/1M wektorów" },
+    { type:"write", file:"progress", tag:"ZAPIS",   cls:"write",  text:"Zapisuję progress.md\n[KROK 1] Zainicjowano zadanie: analiza dostawców vector DB" },
+    { type:"read",  file:"plan",     tag:"ODCZYT",  cls:"read",   text:"Czytam plan.md przed wywołaniem narzędzia — upewniam się że szukam właściwych danych" },
+    { type:"action",                 tag:"AKCJA",   cls:"action", text:"search_web('Pinecone pricing 2024 latency benchmarks')" },
+    { type:"write", file:"findings", tag:"ZAPIS",   cls:"write",  text:"Zapisuję findings.md\n[Pinecone] $70/mo starter, latencja p99: 28ms, limit 1M wektorów na planie startowym" },
+    { type:"write", file:"progress", tag:"ZAPIS",   cls:"write",  text:"[KROK 2] Zebrano dane Pinecone" },
+    { type:"read",  file:"plan",     tag:"ODCZYT",  cls:"read",   text:"Czytam plan.md — sprawdzam czy następny krok to Weaviate" },
+    { type:"action",                 tag:"AKCJA",   cls:"action", text:"search_web('Weaviate self-hosted vs cloud cost latency')" },
+    { type:"write", file:"findings", tag:"ZAPIS",   cls:"write",  text:"[Weaviate] self-hosted bezpłatny, cloud $25/mo, latencja p99: 19ms przy HNSW" },
+    { type:"write", file:"progress", tag:"ZAPIS",   cls:"write",  text:"[KROK 3] Zebrano dane Weaviate" },
+    { type:"read",  file:"plan",     tag:"ODCZYT",  cls:"read",   text:"Czytam plan.md — ostatni dostawca: Qdrant" },
+    { type:"action",                 tag:"AKCJA",   cls:"action", text:"search_web('Qdrant benchmarks large scale vectors')" },
+    { type:"write", file:"findings", tag:"ZAPIS",   cls:"write",  text:"[Qdrant] open-source + cloud $20/mo, latencja p99: 15ms, najlepsza skalowalność" },
+    { type:"read",  file:"findings", tag:"ODCZYT",  cls:"read",   text:"Czytam findings.md — syntetyzuję wszystkie dane przed raportem" },
+    { type:"write", file:"progress", tag:"ZAPIS",   cls:"write",  text:"[KROK 4] Synteza danych — generowanie raportu" },
+    { type:"done",                   tag:"WYNIK",   cls:"done",   text:"Raport gotowy:\nQdrant: NAJLEPSZA opcja (15ms p99, $20/mo, skaluje do 100M+)\nWeaviate: dobry self-hosted, latencja 19ms\nPinecone: łatwy start ale najdroższy\nHipoteza potwierdzona." },
+  ],
+  // ── Scenariusz 1: dryf bez scaffoldingu ──
+  [
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('vector database comparison 2024')" },
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('Pinecone pricing')" },
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('embedding models comparison')" },
+    { type:"warn",   tag:"DRYF",  cls:"warn",   text:"Agent zboczył z kursu — zaczął badać modele embeddingowe zamiast baz danych. Brak planu do przeczytania." },
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('OpenAI text-embedding-3 vs Cohere')" },
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('Pinecone pricing')" },
+    { type:"warn",   tag:"DRYF",  cls:"warn",   text:"Agent ponownie szuka danych Pinecone — już je miał w kontekście, ale kontekst się przesunął. Powtórzenie pracy." },
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('best vector database for startup')" },
+    { type:"warn",   tag:"DRYF",  cls:"warn",   text:"Pytanie zbyt ogólne — agent zapomniał że kryteria to latencja p99 i koszt. Brak hipotezy do weryfikacji." },
+    { type:"action", tag:"AKCJA", cls:"action", text:"search_web('Qdrant vs Pinecone Reddit')" },
+    { type:"warn",   tag:"KONIEC",cls:"warn",   text:"Limit kroków. Agent nie dostarczył raportu — zbierał dane bez struktury, nie zsyntetyzował wyników." },
+  ],
+  // ── Scenariusz 2: staleness check ──
+  [
+    { type:"write", file:"plan",     tag:"ZAPIS",  cls:"write",  text:"Tworzę plan.md\nCel: analiza churn risk Q2\nMetryka: NPS, aktywność, odnowienia" },
+    { type:"write", file:"progress", tag:"ZAPIS",  cls:"write",  text:"[START] Zadanie rozpoczęte" },
+    { type:"action",                 tag:"AKCJA",  cls:"action", text:"db_query('customers WHERE nps < 7')" },
+    { type:"action",                 tag:"AKCJA",  cls:"action", text:"db_query('customers WHERE last_login > 30d')" },
+    { type:"action",                 tag:"AKCJA",  cls:"action", text:"db_query('licenses WHERE expiry < 30d')" },
+    { type:"stale",  file:"progress",tag:"STALE",  cls:"stale",  text:"BLOKADA: progress.md nie był aktualizowany od 3 kroków. Wymagany zapis przed dalszym działaniem." },
+    { type:"write", file:"progress", tag:"ZAPIS",  cls:"write",  text:"[KROK 4] Zebrano: 23 klientów NPS<7, 41 nieaktywnych, 12 wygasające licencje" },
+    { type:"read",  file:"plan",     tag:"ODCZYT", cls:"read",   text:"Czytam plan.md — sprawdzam czy pokryłem wszystkie metryki" },
+    { type:"write", file:"findings", tag:"ZAPIS",  cls:"write",  text:"Łączny churn risk: 58 unikalnych klientów\nTop 3 ryzyka: Acme Corp, TechFlow, DataSense" },
+    { type:"stale",  file:"plan",    tag:"STALE",  cls:"stale",  text:"BLOKADA: plan.md nie był czytany od dłuższego czasu. Agent musi zweryfikować czy jest na właściwej ścieżce." },
+    { type:"read",  file:"plan",     tag:"ODCZYT", cls:"read",   text:"Czytam plan.md — wszystkie metryki pokryte. Można syntetyzować." },
+    { type:"done",                   tag:"WYNIK",  cls:"done",   text:"Raport churn risk Q2 gotowy.\n58 klientów w strefie ryzyka.\nPriorytet: Acme Corp (NPS 4, wygasa za 18 dni)." },
+  ]
+];
+
+function selectScenario(idx) {
+  currentScenario = idx;
+  document.querySelectorAll(".sc-btn").forEach((b,i) => b.classList.toggle("active", i===idx));
+  resetUI();
+}
+
+function resetUI() {
+  reads=0; writes=0; steps=0; staleness=0;
+  updateStats();
+  document.getElementById("log").innerHTML = "";
+  document.getElementById("body-plan").textContent = "— plik pusty —";
+  document.getElementById("body-findings").textContent = "— plik pusty —";
+  document.getElementById("body-progress").textContent = "— plik pusty —";
+  ["plan","findings","progress"].forEach(f => {
+    setStaleness(f, 100);
+  });
+  ["ok","drift","blocked"].forEach(v => document.getElementById("verdict-"+v).classList.remove("show"));
+  document.getElementById("progressBar").style.display = "none";
+  document.getElementById("runBtn").disabled = false;
+}
+
+function setStaleness(file, pct) {
+  const el = document.getElementById("stale-"+file);
+  if (!el) return;
+  el.style.width = pct+"%";
+  el.className = "staleness-fill" + (pct < 30 ? " stale" : pct < 60 ? " warn" : "");
+}
+
+function flashFile(file, type) {
+  const card = document.getElementById("file-"+file);
+  if (!card) return;
+  card.classList.add("flash-"+type);
+  setTimeout(() => card.classList.remove("flash-"+type), 800);
+}
+
+function updateFileBody(file, text) {
+  const el = document.getElementById("body-"+file);
+  if (!el) return;
+  el.textContent = text;
+}
+
+function updateStats() {
+  document.getElementById("s-reads").textContent = reads;
+  document.getElementById("s-writes").textContent = writes;
+  document.getElementById("s-steps").textContent = steps;
+  document.getElementById("s-staleness").textContent = staleness;
+}
+
+function addLog(tag, tagCls, cls, text) {
+  const log = document.getElementById("log");
+  const div = document.createElement("div");
+  div.className = "log-entry " + cls;
+  div.innerHTML = `<span class="log-tag tag-${tagCls}">${tag}</span>${text.split('\n').join('<br>')}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  setTimeout(() => div.classList.add("show"), 20);
+}
+
+const fileContents = { plan:"— plik pusty —", findings:"— plik pusty —", progress:"— plik pusty —" };
+
+async function startRun() {
+  if (running) return;
+  running = true;
+  resetUI();
+  document.getElementById("runBtn").disabled = true;
+  document.getElementById("progressBar").style.display = "flex";
+
+  const sc = scenarios[currentScenario];
+  const staleCounters = { plan:0, findings:0, progress:0 };
+
+  for (let i = 0; i < sc.length; i++) {
+    const s = sc[i];
+    await delay(i===0 ? 200 : 700);
+
+    steps++;
+    if (s.type === "read")  reads++;
+    if (s.type === "write") writes++;
+    if (s.type === "stale") staleness++;
+
+    addLog(s.tag, s.tag==="ZAPIS"?"write": s.tag==="ODCZYT"?"read": s.tag==="STALE"?"stale": s.tag==="DRYF"||s.tag==="KONIEC"?"warn": s.tag==="WYNIK"?"done":"action",
+           s.cls, s.text);
+    updateStats();
+
+    if (s.type === "write" && s.file) {
+      const lines = s.text.split('\n').slice(1).join('\n');
+      fileContents[s.file] = lines;
+      updateFileBody(s.file, lines);
+      flashFile(s.file, "write");
+      staleCounters[s.file] = 0;
+      setStaleness(s.file, 100);
+    }
+    if (s.type === "read" && s.file) {
+      flashFile(s.file, "read");
+      staleCounters[s.file] = 0;
+      setStaleness(s.file, 100);
+    }
+
+    // decay staleness for other files
+    Object.keys(staleCounters).forEach(f => {
+      if (!(s.file === f && (s.type==="write"||s.type==="read"))) {
+        staleCounters[f]++;
+        const pct = Math.max(0, 100 - staleCounters[f]*20);
+        setStaleness(f, pct);
+      }
+    });
+
+    document.getElementById("progressText").textContent = `Krok ${steps} z ${sc.length}...`;
+  }
+
+  document.getElementById("progressBar").style.display = "none";
+  document.getElementById("runBtn").disabled = false;
+
+  await delay(400);
+  const verdictMap = [0,1,2];
+  const verdicts = ["ok","drift","blocked"];
+  document.getElementById("verdict-"+verdicts[currentScenario]).classList.add("show");
+  running = false;
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+resetUI();
+</script>
+</body>
+</html>
