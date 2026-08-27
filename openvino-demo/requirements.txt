@@ -1,0 +1,6 @@
+# Rdzeń — wystarcza do 01 i 02
+openvino>=2025.0
+
+# Opcjonalnie — do 03_embeddings.py (prawdziwy model z Hugging Face)
+# optimum[openvino]>=1.24
+# transformers>=4.44
