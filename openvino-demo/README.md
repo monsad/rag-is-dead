@@ -56,6 +56,35 @@ na obu maszynach, bo kwantyzacja jest deterministyczna).
 Praktycznie: na nowym Xeonie kwantyzuj dla rozmiaru modelu, nie dla prędkości.
 Na starszym serwerze, laptopie bez AMX, NPU czy urządzeniu brzegowym — kwantyzuj dla prędkości.
 
+## Środowisko pomiarowe
+
+Pomiary wykonano w **efemerycznym kontenerze chmurowym** (wirtualizacja KVM,
+4 vCPU, 15 GB RAM), a nie na dedykowanym sprzęcie. Ma to trzy konsekwencje,
+które trzeba czytać razem z liczbami:
+
+- **Model procesora jest zamaskowany przez hypervisora** — `/proc/cpuinfo` podaje
+  tylko „Intel(R) Xeon(R) Processor @ 2.10/2.80GHz", bez numeru SKU ani generacji.
+  Maszyny są tu identyfikowane przez **zestaw instrukcji**, który da się zweryfikować
+  (`amx_tile`, `amx_int8`, `amx_bf16`, `avx512_bf16`, `avx512_vnni`) oraz przez
+  `OPTIMIZATION_CAPABILITIES` raportowane przez sam OpenVINO. Nie twierdzimy tu,
+  że to Sapphire Rapids — twierdzimy, że maszyna A ma AMX i bf16, a maszyna B nie.
+- **VM jest współdzielona** — bezwzględne wartości przepustowości zależą od obciążenia
+  sąsiadów. Między przebiegami tej samej konfiguracji obserwowano rozrzut rzędu 20%.
+  Dlatego wnioski opierają się na **stosunkach** (bf16/f32, int8/bf16), a różnice
+  poniżej ~1.2x są traktowane jako szum, nie jako zysk.
+- **Zmiana maszyny nie była zaplanowana** — kontener został przeniesiony na innego
+  hosta w trakcie pracy. Maszyna B pojawiła się przypadkiem i została wykorzystana
+  jako grupa kontrolna.
+
+Dokładność (top-1, top-5, zgodność predykcji) jest **niewrażliwa na to wszystko** —
+wyszła identyczna na obu hostach co do 0,1 p.p., bo kwantyzacja jest deterministyczna.
+Zaufania wymagają wyłącznie liczby czasowe.
+
+Jeśli potrzebujesz wyników przypisanych do konkretnego procesora, uruchom projekt
+na instancji o znanym SKU (np. GCP C3 lub AWS m7i dla Sapphire Rapids z AMX,
+starsze rodziny dla porównania bez AMX) albo na własnym sprzęcie — cały pipeline
+to trzy komendy.
+
 ## Metodologia
 
 Rzeczy, które łatwo zrobić źle, a które psują wynik:
