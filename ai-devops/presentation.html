@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI w cyklu wytwarzania oprogramowania — Copilot · CI/CD · Kubernetes · LLM</title>
+<style>
+  :root {
+    --bg: #f7f9fb;
+    --bg2: #eef2f7;
+    --accent: #288cbb;
+    --accent2: #1a6e96;
+    --accent3: #0ea871;
+    --accent4: #f59e0b;
+    --text: #0f0f0f;
+    --text-dim: #64748b;
+    --border: rgba(40,140,187,0.18);
+    --card: rgba(255,255,255,0.95);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── SLIDESHOW ── */
+  .slideshow { width: 100vw; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 60px;
+    opacity: 0; transform: translateX(60px);
+    transition: opacity .5s ease, transform .5s ease;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1; transform: translateX(0);
+    pointer-events: all;
+  }
+  .slide.exit {
+    opacity: 0; transform: translateX(-60px);
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(40,140,187,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40,140,187,.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+    z-index: 0;
+  }
+  .slide { z-index: 1; }
+
+  /* ── GLOW ORBS ── */
+  .orb {
+    position: fixed; border-radius: 50%;
+    filter: blur(140px); opacity: .12; z-index: 0;
+    pointer-events: none;
+  }
+  .orb1 { width: 600px; height: 600px; background: #74e2c5; top: -200px; right: -100px; }
+  .orb2 { width: 500px; height: 500px; background: #288cbb; bottom: -200px; left: -100px; }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 16px; z-index: 10;
+  }
+  .nav button {
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--accent); padding: 10px 24px; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(40,140,187,.12);
+    transition: background .2s, transform .1s;
+  }
+  .nav button:hover { background: rgba(40,140,187,.08); transform: scale(1.05); }
+  .nav .counter { color: var(--text-dim); font-size: 14px; min-width: 60px; text-align: center; }
+
+  /* ── PROGRESS BAR ── */
+  .progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); z-index: 20; transition: width .4s; }
+
+  /* ── SLIDE NUMBER ── */
+  .slide-num {
+    position: fixed; top: 24px; right: 32px;
+    font-size: 12px; color: var(--text-dim); z-index: 10;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── TYPOGRAPHY ── */
+  .kicker {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 16px; font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(36px, 5vw, 68px); font-weight: 800;
+    line-height: 1.1; text-align: center;
+    background: linear-gradient(135deg, #0f0f0f 0%, var(--accent) 55%, #74e2c5 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  h2 {
+    font-size: clamp(24px, 3vw, 40px); font-weight: 700;
+    background: linear-gradient(90deg, #0f0f0f, var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 32px;
+  }
+  .subtitle {
+    font-size: 18px; color: var(--text-dim); margin-top: 16px; text-align: center;
+  }
+  .author {
+    margin-top: 48px; font-size: 14px; color: var(--text-dim);
+    border-top: 1px solid var(--border); padding-top: 20px; text-align: center;
+  }
+  .author strong { color: var(--accent); }
+
+  /* ── CARDS ── */
+  .cards { display: grid; gap: 20px; width: 100%; max-width: 1000px; }
+  .cards-3 { grid-template-columns: repeat(3, 1fr); }
+  .cards-2 { grid-template-columns: repeat(2, 1fr); }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px;
+    box-shadow: 0 2px 16px rgba(40,140,187,.08);
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 8px 28px rgba(40,140,187,.15); }
+  .card .icon { font-size: 32px; margin-bottom: 12px; }
+  .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #0f0f0f; }
+  .card p, .card li { font-size: 14px; color: var(--text-dim); line-height: 1.6; }
+  .card ul { padding-left: 16px; }
+  .card .stat {
+    font-size: 28px; font-weight: 800; color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .card.accent-green { border-color: rgba(16,185,129,.3); }
+  .card.accent-green .stat { color: var(--accent3); }
+  .card.accent-purple { border-color: rgba(124,58,237,.3); }
+  .card.accent-purple .stat { color: var(--accent2); }
+  .card.accent-amber { border-color: rgba(245,158,11,.3); }
+  .card.accent-amber .stat { color: var(--accent4); }
+
+  /* ── BIG QUOTE ── */
+  .quote-block {
+    max-width: 800px; text-align: center;
+  }
+  .quote-block blockquote {
+    font-size: clamp(18px, 2.5vw, 26px); font-style: italic;
+    color: var(--text); line-height: 1.5;
+    border-left: 4px solid var(--accent);
+    padding-left: 28px; text-align: left;
+    margin: 24px 0;
+  }
+  .quote-source { font-size: 14px; color: var(--text-dim); }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; }
+  .flow-step {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px;
+    text-align: center; min-width: 120px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .flow-step strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+  .flow-arrow {
+    font-size: 24px; color: var(--accent); margin: 0 8px; flex-shrink: 0;
+  }
+  .flow-step.highlight { border-color: var(--accent); background: rgba(79,142,247,.1); }
+  .flow-step.green { border-color: var(--accent3); background: rgba(16,185,129,.08); }
+  .flow-step.red-bad { border-color: #ef4444; background: rgba(239,68,68,.08); }
+
+  /* ── COMPARISON TABLE ── */
+  .compare {
+    width: 100%; max-width: 1100px;
+    border-collapse: collapse; font-size: 13px;
+  }
+  .compare th {
+    padding: 14px 16px; text-align: left;
+    border-bottom: 2px solid var(--border);
+    color: var(--accent); font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 1px;
+    background: rgba(40,140,187,.05);
+  }
+  .compare td {
+    padding: 12px 16px; border-bottom: 1px solid rgba(40,140,187,.08);
+    color: var(--text-dim); vertical-align: top;
+  }
+  .compare tr:hover td { background: rgba(40,140,187,.04); }
+  .compare .label { color: #0f0f0f; font-weight: 600; font-size: 14px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; margin: 2px;
+  }
+  .badge-green { background: rgba(16,185,129,.2); color: var(--accent3); }
+  .badge-red   { background: rgba(239,68,68,.2);  color: #f87171; }
+  .badge-blue  { background: rgba(79,142,247,.2); color: var(--accent); }
+
+  /* ── PRINCIPLE BLOCK ── */
+  .principle {
+    background: linear-gradient(135deg, rgba(40,140,187,.08), rgba(116,226,197,.12));
+    border: 1px solid rgba(40,140,187,.25);
+    border-radius: 20px; padding: 40px; max-width: 800px; text-align: center;
+    box-shadow: 0 4px 24px rgba(40,140,187,.1);
+  }
+  .principle h2 { font-size: clamp(22px, 3vw, 38px); margin-bottom: 16px; }
+  .principle p { font-size: 16px; color: var(--text-dim); line-height: 1.7; }
+
+  /* ── TAKEAWAY LIST ── */
+  .takeaways { max-width: 700px; width: 100%; }
+  .takeaway {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 18px 0; border-bottom: 1px solid var(--border);
+  }
+  .takeaway:last-child { border-bottom: none; }
+  .takeaway .num {
+    font-size: 32px; font-weight: 800; color: var(--accent);
+    line-height: 1; min-width: 40px; opacity: .6;
+  }
+  .takeaway .text { font-size: 16px; color: var(--text-dim); line-height: 1.5; }
+  .takeaway .text strong { color: #0f0f0f; }
+
+  /* ── DECISION TREE ── */
+  .dtree { max-width: 900px; width: 100%; }
+  .dtree-row { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .dtree-q {
+    background: rgba(79,142,247,.1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 18px; font-size: 14px; color: var(--text);
+    min-width: 280px;
+  }
+  .dtree-arrow { color: var(--accent); font-size: 20px; }
+  .dtree-a {
+    border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 700;
+  }
+  .dtree-a.blue  { background: rgba(79,142,247,.15); color: var(--accent); border: 1px solid rgba(79,142,247,.3); }
+  .dtree-a.green { background: rgba(16,185,129,.15); color: var(--accent3); border: 1px solid rgba(16,185,129,.3); }
+  .dtree-a.purple { background: rgba(124,58,237,.15); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+  .dtree-a.amber { background: rgba(245,158,11,.15); color: var(--accent4); border: 1px solid rgba(245,158,11,.3); }
+  .dtree-a.slate { background: rgba(148,163,184,.1); color: var(--text-dim); border: 1px solid rgba(148,163,184,.2); }
+
+  /* ── AGENDA ── */
+  .agenda { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 800px; width: 100%; }
+  .agenda-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: 0 2px 8px rgba(40,140,187,.07);
+    font-size: 14px; color: var(--text-dim);
+  }
+  .agenda-item .n {
+    font-size: 20px; font-weight: 800; color: var(--accent); min-width: 28px;
+  }
+
+  /* ── FAQ ── */
+  .faq { max-width: 800px; width: 100%; }
+  .faq-item { margin-bottom: 20px; }
+  .faq-q { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  .faq-a { font-size: 14px; color: var(--text-dim); line-height: 1.6; padding-left: 16px; border-left: 2px solid var(--border); }
+
+  /* ── SOURCES ── */
+  .sources { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
+  .source-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--card);
+    font-size: 13px; color: var(--text-dim);
+  }
+  .source-item .src-icon { font-size: 20px; }
+
+  /* ── FINAL SLIDE ── */
+  .final { text-align: center; max-width: 700px; }
+  .final .big-quote {
+    font-size: clamp(20px, 2.5vw, 32px); font-style: italic;
+    color: var(--text); line-height: 1.4; margin: 32px 0;
+  }
+  .final .big-quote em { color: var(--accent); font-style: normal; }
+
+  /* ── KEYFRAMES ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .slide.active .card,
+  .slide.active .takeaway,
+  .slide.active .dtree-row,
+  .slide.active .agenda-item,
+  .slide.active .faq-item {
+    animation: fadeUp .4s ease both;
+  }
+  .slide.active .card:nth-child(1),
+  .slide.active .takeaway:nth-child(1),
+  .slide.active .dtree-row:nth-child(1),
+  .slide.active .agenda-item:nth-child(1),
+  .slide.active .faq-item:nth-child(1) { animation-delay: .05s; }
+  .slide.active .card:nth-child(2),
+  .slide.active .takeaway:nth-child(2),
+  .slide.active .dtree-row:nth-child(2),
+  .slide.active .agenda-item:nth-child(2),
+  .slide.active .faq-item:nth-child(2) { animation-delay: .12s; }
+  .slide.active .card:nth-child(3),
+  .slide.active .takeaway:nth-child(3),
+  .slide.active .dtree-row:nth-child(3),
+  .slide.active .agenda-item:nth-child(3),
+  .slide.active .faq-item:nth-child(3) { animation-delay: .19s; }
+  .slide.active .card:nth-child(4),
+  .slide.active .takeaway:nth-child(4),
+  .slide.active .dtree-row:nth-child(4),
+  .slide.active .agenda-item:nth-child(4),
+  .slide.active .faq-item:nth-child(4) { animation-delay: .26s; }
+  .slide.active .card:nth-child(5),
+  .slide.active .takeaway:nth-child(5),
+  .slide.active .dtree-row:nth-child(5),
+  .slide.active .agenda-item:nth-child(5),
+  .slide.active .faq-item:nth-child(5) { animation-delay: .33s; }
+  .slide.active .card:nth-child(6),
+  .slide.active .takeaway:nth-child(6),
+  .slide.active .dtree-row:nth-child(6),
+  .slide.active .agenda-item:nth-child(6) { animation-delay: .40s; }
+</style>
+<style>
+  /* ── DODATKI DLA TEJ PREZENTACJI ── */
+  .slide { padding: 48px 40px 96px; }
+  .compare.dense td, .compare.dense th { padding: 9px 12px; font-size: 12.5px; }
+  .cards-4 { grid-template-columns: repeat(4, 1fr); }
+  .card.tight { padding: 20px; }
+  .card.tight h3 { font-size: 15px; }
+  .card.tight p, .card.tight li { font-size: 13px; }
+  .note {
+    margin-top: 22px; font-size: 13px; color: var(--text-dim);
+    text-align: center; max-width: 900px;
+  }
+  .note strong { color: var(--accent); }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
+  .pill {
+    border: 1px solid var(--border); background: var(--card);
+    border-radius: 999px; padding: 6px 14px; font-size: 12.5px; color: var(--text-dim);
+  }
+  .pill strong { color: var(--accent); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1100px; width: 100%; }
+  .col-title {
+    font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    font-weight: 700; margin-bottom: 12px;
+  }
+  .col-title.good { color: var(--accent3); }
+  .col-title.bad  { color: #ef4444; }
+  .list-plain { list-style: none; }
+  .list-plain li {
+    font-size: 14px; color: var(--text-dim); line-height: 1.55;
+    padding: 7px 0 7px 22px; position: relative; border-bottom: 1px solid rgba(40,140,187,.08);
+  }
+  .list-plain li:last-child { border-bottom: none; }
+  .list-plain li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); }
+  .list-plain li.ok::before  { content: '✓'; color: var(--accent3); }
+  .list-plain li.no::before  { content: '✕'; color: #ef4444; }
+  .stack { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 980px; }
+  .layer {
+    display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--border); background: var(--card);
+    border-radius: 12px; padding: 14px 18px;
+    box-shadow: 0 2px 10px rgba(40,140,187,.06);
+  }
+  .layer .lbl {
+    min-width: 190px; font-weight: 700; font-size: 14px; color: var(--text);
+  }
+  .layer .dsc { font-size: 13.5px; color: var(--text-dim); line-height: 1.5; }
+  .layer.hi { border-color: var(--accent); background: rgba(40,140,187,.06); }
+  .layer.warn { border-color: rgba(245,158,11,.45); background: rgba(245,158,11,.06); }
+  .kpi-row { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  .kpi {
+    border: 1px solid var(--border); background: var(--card); border-radius: 14px;
+    padding: 18px 24px; min-width: 170px; text-align: center;
+  }
+  .kpi .v { font-size: 26px; font-weight: 800; color: var(--accent); }
+  .kpi .k { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: rgba(40,140,187,.10); border-radius: 4px; padding: 1px 5px; font-size: .92em;
+  }
+  a { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="progress" id="progress"></div>
+<div class="slide-num" id="slideNum"></div>
+
+<div class="slideshow" id="slideshow">
+
+  <!-- ═══ 1: TYTUŁ ═══ -->
+  <div class="slide active">
+    <div class="kicker">Softkraft</div>
+    <h1>AI w cyklu wytwarzania<br>oprogramowania</h1>
+    <p class="subtitle">GitHub Copilot → CI/CD z agentami → Kubernetes dla inferencji → wybór modelu</p>
+    <div class="pill-row">
+      <span class="pill"><strong>Copilot</strong> · agent mode, coding agent, review</span>
+      <span class="pill"><strong>CI/CD</strong> · Actions, agentic workflows, security</span>
+      <span class="pill"><strong>Kubernetes</strong> · vLLM, DRA, Inference Gateway</span>
+      <span class="pill"><strong>LLM</strong> · Claude · GPT · Gemini · open-source</span>
+    </div>
+    <div class="author"><strong>Monika Sadlok</strong> · Softkraft · sierpień 2026</div>
+  </div>
+
+  <!-- ═══ 2: AGENDA ═══ -->
+  <div class="slide">
+    <div class="kicker">Plan prezentacji</div>
+    <h2>Agenda</h2>
+    <div class="agenda">
+      <div class="agenda-item"><span class="n">01</span> Gdzie jesteśmy w 2026</div>
+      <div class="agenda-item"><span class="n">02</span> GitHub Copilot — anatomia produktu</div>
+      <div class="agenda-item"><span class="n">03</span> Plany, kredyty, realny koszt</div>
+      <div class="agenda-item"><span class="n">04</span> Konfiguracja: AGENTS.md, custom agents, MCP</div>
+      <div class="agenda-item"><span class="n">05</span> LLM w pipeline CI/CD</div>
+      <div class="agenda-item"><span class="n">06</span> Bezpieczeństwo agentów w CI</div>
+      <div class="agenda-item"><span class="n">07</span> Metryki i ROI</div>
+      <div class="agenda-item"><span class="n">08</span> Kubernetes dla inferencji</div>
+      <div class="agenda-item"><span class="n">09</span> GPU, skalowanie, koszty</div>
+      <div class="agenda-item"><span class="n">10</span> Porównanie modeli &amp; framework decyzyjny</div>
+    </div>
+  </div>
+
+  <!-- ═══ 3: TL;DR ═══ -->
+  <div class="slide">
+    <div class="kicker">TL;DR</div>
+    <h2>Cztery tezy tej prezentacji</h2>
+    <div class="cards cards-2" style="max-width:1020px">
+      <div class="card">
+        <div class="icon">🤖</div>
+        <h3>1 · Autouzupełnianie to już nie jest produkt</h3>
+        <p>Wartość przeniosła się z „podpowiedz linijkę" na „wykonaj zadanie i otwórz PR". Copilot, Claude Code i Codex konkurują teraz na poziomie <strong>harnessu agenta</strong>, nie modelu.</p>
+      </div>
+      <div class="card accent-amber">
+        <div class="icon">🔐</div>
+        <h3>2 · Agent w CI to nowa powierzchnia ataku</h3>
+        <p>Agent czytający untrusted input (issue, komentarz, diff z forka) z uprawnieniami pipeline'u = prompt injection z dostępem do sekretów. To już nie teoria — 2026 przyniósł działające exploity.</p>
+      </div>
+      <div class="card accent-green">
+        <div class="icon">☸️</div>
+        <h3>3 · Kubernetes dojrzał do inferencji</h3>
+        <p>DRA GA (1.34), Gateway API Inference Extension, vLLM/llm-d. Self-hosting przestał być projektem badawczym — stał się decyzją kosztową i compliance'ową.</p>
+      </div>
+      <div class="card accent-purple">
+        <div class="icon">🧭</div>
+        <h3>4 · Nie ma „najlepszego modelu"</h3>
+        <p>Jest najlepszy model <em>dla danej ścieżki</em>. Routing per zadanie (koszt × jakość × latencja) bije wybór jednego dostawcy na wszystko.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 4: EWOLUCJA ═══ -->
+  <div class="slide">
+    <div class="kicker">Kontekst</div>
+    <h2>Od podpowiedzi do współpracownika</h2>
+    <div class="flow" style="max-width:1150px">
+      <div class="flow-step"><strong>2021–22</strong>Autouzupełnianie<br>w edytorze</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><strong>2023</strong>Chat z kontekstem<br>pliku i repo</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><strong>2024</strong>Edycje wieloplikowe<br>+ narzędzia</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step highlight"><strong>2025</strong>Agent mode<br>terminal, testy, pętla</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step green"><strong>2026</strong>Agent w CI<br>issue → PR → review</div>
+    </div>
+    <div class="principle" style="margin-top:34px; padding:26px; max-width:900px;">
+      <p style="font-size:16px;">
+        Każdy krok przesuwał <strong style="color:var(--accent2)">jednostkę pracy</strong>:<br>
+        linia → funkcja → plik → zmiana → <strong style="color:var(--accent)">zadanie</strong>.<br><br>
+        Konsekwencja: wąskim gardłem przestało być pisanie kodu.
+        Wąskim gardłem jest <em>review, weryfikacja i kontekst</em>.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ 5: COPILOT — WARSTWY ═══ -->
+  <div class="slide">
+    <div class="kicker">GitHub Copilot</div>
+    <h2>Jeden brand, sześć różnych produktów</h2>
+    <div class="stack">
+      <div class="layer"><span class="lbl">Code completions</span><span class="dsc">Inline w IDE. Najtańsze, najbardziej „niewidzialne". W nowym modelu rozliczeń zwykle poza pulą kredytów.</span></div>
+      <div class="layer"><span class="lbl">Copilot Chat</span><span class="dsc">Pytania o kod, wyjaśnianie, refaktor punktowy. Kontekst: otwarte pliki, zaznaczenie, indeks repo.</span></div>
+      <div class="layer hi"><span class="lbl">Agent mode (IDE)</span><span class="dsc">Pętla agentowa lokalnie: planuje, edytuje wiele plików, uruchamia terminal i testy, poprawia po błędzie. Ty jesteś w pętli.</span></div>
+      <div class="layer hi"><span class="lbl">Coding agent (cloud)</span><span class="dsc">Przypisujesz mu <em>issue</em>. Odpala się w GitHub Actions, pracuje na branchu, otwiera PR do ludzkiego review. Ty jesteś <em>nad</em> pętlą.</span></div>
+      <div class="layer"><span class="lbl">Copilot code review</span><span class="dsc">Automatyczny reviewer na PR — komentarze inline, sugestie zmian. Uzupełnia, nie zastępuje, review człowieka.</span></div>
+      <div class="layer"><span class="lbl">Copilot CLI / custom agents</span><span class="dsc">Agenci z własnym system promptem i zestawem narzędzi, definiowani w repo i uruchamiani z terminala lub workflow.</span></div>
+    </div>
+    <p class="note">Praktyczna konsekwencja: <strong>„czy używacie Copilota" to złe pytanie</strong>. Dobre: które z tych sześciu warstw są włączone, dla kogo i z jakimi guardrails.</p>
+  </div>
+
+  <!-- ═══ 6: PLANY I KREDYTY ═══ -->
+  <div class="slide">
+    <div class="kicker">Rozliczenie</div>
+    <h2>Plany i model kosztowy (2026)</h2>
+    <table class="compare dense" style="max-width:1000px">
+      <tr><th>Plan</th><th>Cena</th><th>Dla kogo</th><th>Co warto wiedzieć</th></tr>
+      <tr><td class="label">Free</td><td>0 $</td><td>Próg wejścia</td><td>Limitowane completions i czaty — do oceny, nie do produkcji.</td></tr>
+      <tr><td class="label">Pro</td><td>~10 $/mies.</td><td>Pojedynczy dev</td><td>Pełne completions + pula kredytów AI odnawiana miesięcznie.</td></tr>
+      <tr><td class="label">Pro+</td><td>~39 $/mies.</td><td>Heavy user / agenty</td><td>Większa pula, dostęp do najmocniejszych modeli.</td></tr>
+      <tr><td class="label">Business</td><td>~19 $/user</td><td>Zespoły</td><td>Polityki organizacji, wykluczenie plików z kontekstu, audyt.</td></tr>
+      <tr><td class="label">Enterprise</td><td>~39 $/user</td><td>Organizacje</td><td>Wiedza o repo w skali org, zaawansowana kontrola i raportowanie.</td></tr>
+    </table>
+    <div class="principle" style="margin-top:26px; padding:22px; max-width:1000px;">
+      <p style="font-size:15px;">
+        <strong style="color:var(--accent2)">Zmiana z 1 czerwca 2026:</strong> „premium requests" zastąpione przez
+        <strong>GitHub AI Credits</strong> — rozliczenie <em>per token</em>, nie per zapytanie.
+        Cena abonamentu się nie zmieniła, ale zmieniło się, ile za nią dostajesz:
+        długi kontekst i agent w pętli potrafią zjeść pulę wielokrotnie szybciej niż czat.
+      </p>
+    </div>
+    <p class="note">Zanim policzysz ROI: <strong>zmierz zużycie kredytów per zespół przez 2–4 tygodnie</strong>. Ceny i limity zmieniają się szybciej niż slajdy — traktuj liczby jako rząd wielkości i weryfikuj w cenniku.</p>
+  </div>
+
+  <!-- ═══ 7: KONFIGURACJA ═══ -->
+  <div class="slide">
+    <div class="kicker">Praktyka</div>
+    <h2>Agent jest tak dobry, jak jego kontekst</h2>
+    <div class="cards cards-2" style="max-width:1060px">
+      <div class="card tight">
+        <h3>📄 <code>AGENTS.md</code> / custom instructions</h3>
+        <p>Konwencje repo, sposób uruchamiania testów, czego <em>nie</em> ruszać, definicja „done". To najtańsza inwestycja o największym zwrocie — jeden plik zmienia jakość każdego uruchomienia.</p>
+      </div>
+      <div class="card tight">
+        <h3>🎭 Custom agents</h3>
+        <p>Wyspecjalizowani agenci z własnym promptem i zawężonym zestawem narzędzi: <em>migrator testów</em>, <em>reviewer bezpieczeństwa</em>, <em>bumper zależności</em>. Wąski zakres = przewidywalny wynik.</p>
+      </div>
+      <div class="card tight">
+        <h3>🔌 MCP — narzędzia i dane</h3>
+        <p>Model Context Protocol podpina agentowi issue trackera, dokumentację, bazę, monitoring. Zasada: <strong>minimalny zestaw narzędzi</strong> — każde kolejne to i ryzyko, i gorsze decyzje modelu.</p>
+      </div>
+      <div class="card tight">
+        <h3>🧪 Zielony pipeline jako feedback</h3>
+        <p>Agent bez szybkich testów i lintera zgaduje. Z nimi — iteruje. Czas <code>test+lint</code> to realny parametr jakości agenta, nie tylko DX.</p>
+      </div>
+    </div>
+    <p class="note">Reguła kciuka: <strong>jeśli nowy człowiek w zespole nie zrobiłby zadania z samego README — agent też nie zrobi</strong>. Napraw dokumentację, zanim obwinisz model.</p>
+  </div>
+
+  <!-- ═══ 8: CO DZIAŁA / CO NIE ═══ -->
+  <div class="slide">
+    <div class="kicker">Realizm</div>
+    <h2>Do czego agent nadaje się dziś, a do czego nie</h2>
+    <div class="two-col">
+      <div>
+        <div class="col-title good">Wysoka skuteczność</div>
+        <ul class="list-plain">
+          <li class="ok">Testy do istniejącego kodu i uzupełnianie pokrycia</li>
+          <li class="ok">Mechaniczne migracje (API, framework, składnia) w wielu plikach</li>
+          <li class="ok">Bugi z reprodukcją: stacktrace + failing test</li>
+          <li class="ok">Boilerplate: endpointy, DTO, klienci, konfiguracja</li>
+          <li class="ok">Pierwsza warstwa review: literówki, null-safety, brak testu</li>
+          <li class="ok">Dokumentacja i changelogi z diffa</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-title bad">Niska skuteczność / wysokie ryzyko</div>
+        <ul class="list-plain">
+          <li class="no">Decyzje architektoniczne i trade-offy międzyzespołowe</li>
+          <li class="no">Zmiany w kodzie bez testów i bez właściciela</li>
+          <li class="no">Wydajność i współbieżność — wymagają pomiaru, nie intuicji</li>
+          <li class="no">Domenowe reguły biznesowe nieopisane nigdzie w repo</li>
+          <li class="no">Zadania „posprzątaj repo" bez zdefiniowanego zakresu</li>
+          <li class="no">Cokolwiek, czego nikt nie zweryfikuje przed merge</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Anti-pattern numer jeden: <strong>PR-y wygenerowane szybciej, niż zespół jest w stanie je zrecenzować</strong>. Przepustowość review staje się nowym wąskim gardłem — planuj ją świadomie.</p>
+  </div>
+
+  <!-- ═══ 9: LLM W PIPELINE ═══ -->
+  <div class="slide">
+    <div class="kicker">CI/CD</div>
+    <h2>Gdzie realnie wpiąć LLM w pipeline</h2>
+    <div class="stack" style="max-width:1050px">
+      <div class="layer"><span class="lbl">Pre-commit / lokalnie</span><span class="dsc">Konwencja commitów, szybki self-review diffa, generowanie testów przed pushem. Najtańsze i bez sekretów.</span></div>
+      <div class="layer hi"><span class="lbl">Na PR (najlepszy ROI)</span><span class="dsc">Automatyczne review, opis PR z diffa, wykrywanie brakujących testów, sprawdzenie zgodności z konwencjami repo.</span></div>
+      <div class="layer"><span class="lbl">Po nieudanym buildzie</span><span class="dsc">Triage logów: co pękło, czy to flake, czy regresja — z propozycją patcha zamiast surowego stacktrace'a.</span></div>
+      <div class="layer"><span class="lbl">Zadania zaplanowane</span><span class="dsc">Nocne bumpy zależności, migracje, porządki w TODO, aktualizacja dokumentacji. Wynik zawsze jako PR do review.</span></div>
+      <div class="layer warn"><span class="lbl">Release i produkcja</span><span class="dsc">Release notes z commitów — OK. Automatyczny merge lub deploy sterowany przez agenta — <strong>nie</strong>. Gate zostaje przy człowieku.</span></div>
+    </div>
+    <p class="note">Zasada: <strong>agent proponuje, pipeline weryfikuje, człowiek zatwierdza</strong>. Każdy krok, w którym agent jest jedyną kontrolą, jest krokiem za daleko.</p>
+  </div>
+
+  <!-- ═══ 10: AGENTIC WORKFLOWS ═══ -->
+  <div class="slide">
+    <div class="kicker">Mechanika</div>
+    <h2>Agent w GitHub Actions — jak to działa</h2>
+    <div class="flow" style="max-width:1150px">
+      <div class="flow-step"><strong>Trigger</strong>issue, komentarz,<br>cron, PR</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><strong>Workflow</strong>Actions +<br>instrukcje w Markdown</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step highlight"><strong>Agent</strong>Copilot / Claude / Codex<br>w izolowanym runnerze</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><strong>Efekt</strong>branch, PR,<br>komentarz</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step green"><strong>Człowiek</strong>review<br>i merge</div>
+    </div>
+    <div class="cards cards-3" style="max-width:1100px; margin-top:34px;">
+      <div class="card tight">
+        <h3>Co zyskujesz</h3>
+        <p>Automatyzacja opisana <em>językiem naturalnym</em> zamiast setek linii YAML-a i skryptów, które i tak nikt nie utrzymuje.</p>
+      </div>
+      <div class="card tight accent-amber">
+        <h3>Co tracisz</h3>
+        <p>Determinizm. Ten sam trigger może dać inny wynik — więc każdy efekt musi przechodzić przez ten sam gate co kod człowieka.</p>
+      </div>
+      <div class="card tight accent-green">
+        <h3>Warunek wejścia</h3>
+        <p>Uprawnienia tokenu ograniczone do minimum, brak sekretów w zasięgu agenta, wszystko z untrusted źródeł traktowane jako dane.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 11: BEZPIECZEŃSTWO — ZAGROŻENIE ═══ -->
+  <div class="slide">
+    <div class="kicker">Bezpieczeństwo · 1/2</div>
+    <h2>Prompt injection w CI to realny incydent, nie teoria</h2>
+    <div class="cards cards-3" style="max-width:1120px">
+      <div class="card tight" style="border-color:#ef444470">
+        <div class="stat" style="color:#ef4444">Wejście</div>
+        <h3>Untrusted input</h3>
+        <p>Treść issue, komentarza, opisu PR, nazwa brancha, diff z forka. Każdy z darmowym kontem GitHuba może je wstrzyknąć.</p>
+      </div>
+      <div class="card tight" style="border-color:#ef444470">
+        <div class="stat" style="color:#ef4444">Przywilej</div>
+        <h3>Uprawnienia pipeline'u</h3>
+        <p>Agent działa jako zaufany aktor CI: tokeny, klucze do rejestru, dostęp do zapisu. Model nie odróżnia „danych" od „polecenia".</p>
+      </div>
+      <div class="card tight" style="border-color:#ef444470">
+        <div class="stat" style="color:#ef4444">Wyjście</div>
+        <h3>Kanał eksfiltracji</h3>
+        <p>Komentarz, commit, request sieciowy. Sekret wyprowadzony do publicznego wątku wygląda jak normalna aktywność bota.</p>
+      </div>
+    </div>
+    <div class="principle" style="margin-top:28px; padding:24px; max-width:1000px;">
+      <p style="font-size:15.5px;">
+        Te trzy elementy razem to <strong style="color:#ef4444">cała podatność</strong> — nie trzeba żadnego błędu w kodzie.
+        W 2026 badacze (m.in. CSA, Aikido, Microsoft Security) pokazali działające ataki tej klasy
+        przeciw akcjom AI od wielu dostawców naraz.
+        <br><br>
+        <strong>Wcześniej atakujący potrzebował write access. Teraz wystarczy, że założy issue.</strong>
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ 12: BEZPIECZEŃSTWO — HARDENING ═══ -->
+  <div class="slide">
+    <div class="kicker">Bezpieczeństwo · 2/2</div>
+    <h2>Checklista hardeningu agentów w CI</h2>
+    <div class="two-col">
+      <div>
+        <div class="col-title good">Zrób to dziś</div>
+        <ul class="list-plain">
+          <li class="ok">Pinuj akcje do pełnego SHA, nie do tagu</li>
+          <li class="ok">Wytnij lub ściśle ogranicz <code>pull_request_target</code> z checkoutem forka</li>
+          <li class="ok"><code>permissions:</code> jawnie, domyślnie <code>read</code>, zapis punktowo</li>
+          <li class="ok">Sekrety tylko w jobach, do których agent nie ma dostępu</li>
+          <li class="ok">Allowlist sieci wychodzącej dla runnera agenta</li>
+          <li class="ok">Wymagany human approval przed merge — bez wyjątków</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-title bad">Czerwone flagi w review workflow</div>
+        <ul class="list-plain">
+          <li class="no">Treść issue/komentarza wklejana wprost do promptu jako instrukcja</li>
+          <li class="no">Agent z <code>contents: write</code> na triggerze od osoby z zewnątrz</li>
+          <li class="no"><code>GITHUB_TOKEN</code> lub klucze API w tym samym środowisku co agent</li>
+          <li class="no">Brak limitu iteracji i budżetu — agent w nieskończonej pętli</li>
+          <li class="no">Logi agenta bez retencji i bez audytu, kto co uruchomił</li>
+          <li class="no">Automerge po zielonym CI, bez oczu człowieka</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Model mentalny: <strong>traktuj agenta w CI jak zewnętrznego kontrahenta z dostępem do repo</strong> — najmniejsze możliwe uprawnienia, wszystko logowane, nic nie wchodzi na main bez podpisu człowieka.</p>
+  </div>
+
+  <!-- ═══ 13: METRYKI ═══ -->
+  <div class="slide">
+    <div class="kicker">ROI</div>
+    <h2>Co mierzyć, żeby nie mierzyć iluzji</h2>
+    <div class="kpi-row">
+      <div class="kpi"><div class="v">Lead time</div><div class="k">commit → produkcja</div></div>
+      <div class="kpi"><div class="v">Change failure</div><div class="k">% zmian wymagających naprawy</div></div>
+      <div class="kpi"><div class="v">Review time</div><div class="k">czas i liczba rund na PR</div></div>
+      <div class="kpi"><div class="v">Rework rate</div><div class="k">kod przepisany w ≤30 dni</div></div>
+      <div class="kpi"><div class="v">Koszt / PR</div><div class="k">kredyty + czas ludzi</div></div>
+    </div>
+    <div class="two-col" style="margin-top:32px;">
+      <div>
+        <div class="col-title bad">Metryki-pułapki</div>
+        <ul class="list-plain">
+          <li class="no">Liczba linii wygenerowanych przez AI</li>
+          <li class="no">Acceptance rate podpowiedzi</li>
+          <li class="no">Liczba PR-ów otwartych przez agenta</li>
+          <li class="no">Deklaratywne „oszczędzone godziny" z ankiety</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-title good">Dlaczego akurat te</div>
+        <ul class="list-plain">
+          <li class="ok">DORA mierzy <em>dostarczanie</em>, nie aktywność</li>
+          <li class="ok">Rework wyłapuje kod, który „działał" tylko na demo</li>
+          <li class="ok">Review time pokazuje, gdzie naprawdę powstał korek</li>
+          <li class="ok">Koszt/PR urealnia rozmowę o budżecie na modele</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Punkt odniesienia: <strong>zbierz baseline przed wdrożeniem</strong>. Bez niego każda dyskusja o efekcie AI kończy się wymianą anegdot.</p>
+  </div>
+
+  <!-- ═══ 14: K8S — DLACZEGO ═══ -->
+  <div class="slide">
+    <div class="kicker">Kubernetes · 1/5</div>
+    <h2>API dostawcy czy własna inferencja?</h2>
+    <div class="dtree">
+      <div class="dtree-row"><div class="dtree-q">Dane mogą opuścić waszą infrastrukturę?</div><div class="dtree-arrow">→</div><div class="dtree-a blue">Nie → self-hosting na K8s</div></div>
+      <div class="dtree-row"><div class="dtree-q">Ruch stały i przewidywalny, &gt;~10⁸ tokenów/mies.?</div><div class="dtree-arrow">→</div><div class="dtree-a green">Tak → policz break-even GPU</div></div>
+      <div class="dtree-row"><div class="dtree-q">Potrzebny fine-tuning lub własny model?</div><div class="dtree-arrow">→</div><div class="dtree-a purple">Tak → własny serving</div></div>
+      <div class="dtree-row"><div class="dtree-q">Wymagane twarde SLA na latencję (p99)?</div><div class="dtree-arrow">→</div><div class="dtree-a amber">Tak → dedykowane zasoby</div></div>
+      <div class="dtree-row"><div class="dtree-q">Żadne z powyższych?</div><div class="dtree-arrow">→</div><div class="dtree-a slate">API dostawcy — taniej i szybciej</div></div>
+    </div>
+    <p class="note">Najczęstszy błąd: <strong>self-hosting „dla oszczędności" przy zmiennym ruchu</strong>. GPU płacisz za czas rezerwacji, nie za tokeny — przy 15% wykorzystania API zawsze wygra.</p>
+  </div>
+
+  <!-- ═══ 15: K8S — STOS ═══ -->
+  <div class="slide">
+    <div class="kicker">Kubernetes · 2/5</div>
+    <h2>Stos do serwowania modeli (2026)</h2>
+    <div class="stack">
+      <div class="layer"><span class="lbl">Klient / aplikacja</span><span class="dsc">Zwykle API zgodne z OpenAI — dzięki temu przełączanie między własnym modelem a dostawcą to zmiana <code>base_url</code>.</span></div>
+      <div class="layer hi"><span class="lbl">Inference Gateway</span><span class="dsc"><em>Gateway API Inference Extension</em> (SIG-owy standard K8s): routing świadomy modeli, kolejek i KV-cache — zamiast round-robina, który zabija cache.</span></div>
+      <div class="layer hi"><span class="lbl">Silnik inferencji</span><span class="dsc"><strong>vLLM</strong> jako domyślny wybór: continuous batching, PagedAttention, prefix caching. Alternatywy: TensorRT-LLM, SGLang, TGI.</span></div>
+      <div class="layer"><span class="lbl">Orkiestracja serwowania</span><span class="dsc"><strong>llm-d</strong> — rozdzielenie faz <em>prefill</em> i <em>decode</em> na osobne pody; KServe / KubeRay dla klasycznego ML i zadań rozproszonych.</span></div>
+      <div class="layer"><span class="lbl">Warstwa GPU</span><span class="dsc">Sterowniki DRA, MIG lub time-slicing, topologia NVLink. To tu powstaje 80% problemów z wykorzystaniem sprzętu.</span></div>
+      <div class="layer"><span class="lbl">Obserwowalność</span><span class="dsc">Metryki inferencji, nie tylko CPU: TTFT, TPOT, długość kolejki, zajętość KV-cache, tokeny/s per pod.</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ 16: K8S — GPU ═══ -->
+  <div class="slide">
+    <div class="kicker">Kubernetes · 3/5</div>
+    <h2>GPU: od <code>limits: nvidia.com/gpu: 1</code> do DRA</h2>
+    <div class="cards cards-2" style="max-width:1060px">
+      <div class="card tight">
+        <h3>Stary model — device plugin</h3>
+        <p>Prosisz o <em>liczbę</em> kart. Brak wiedzy o typie, pamięci i topologii. Efekt: model mieszczący się w 20 GB dostaje kartę 80 GB, a inny pod czeka w kolejce.</p>
+      </div>
+      <div class="card tight accent-green">
+        <h3>DRA — GA w Kubernetes 1.34</h3>
+        <p>Deklarujesz <em>właściwości</em> urządzenia (typ, pamięć, interconnect), scheduler dobiera zasób. Sterownik DRA od NVIDII trafił do CNCF — to standard, nie eksperyment.</p>
+      </div>
+      <div class="card tight">
+        <h3>Kueue — kolejki i kwoty</h3>
+        <p>Admission control ponad schedulerem: kwoty per zespół, priorytety, wywłaszczanie. Konieczne, gdy o te same GPU walczą trening, batch i inferencja.</p>
+      </div>
+      <div class="card tight">
+        <h3>KAI Scheduler / gang scheduling</h3>
+        <p>Dla klastrów AI: bin-packing, gang scheduling (wszystko albo nic), świadomość topologii. Bez tego zadania wielo-GPU deadlockują się nawzajem.</p>
+      </div>
+    </div>
+    <p class="note">Dźwignie wykorzystania sprzętu, zanim dokupisz kolejne karty: <strong>MIG</strong> (twardy podział karty), <strong>time-slicing</strong> (dla dev/test), <strong>kwantyzacja</strong>, <strong>współdzielenie modelu przez wiele aplikacji</strong>.</p>
+  </div>
+
+  <!-- ═══ 17: K8S — SKALOWANIE ═══ -->
+  <div class="slide">
+    <div class="kicker">Kubernetes · 4/5</div>
+    <h2>Autoskalowanie: dlaczego HPA po CPU nie zadziała</h2>
+    <div class="two-col">
+      <div>
+        <div class="col-title bad">Co zawodzi</div>
+        <ul class="list-plain">
+          <li class="no">CPU jako sygnał — GPU jest wysycone, CPU śpi</li>
+          <li class="no">Skalowanie po RPS — request to 50 albo 50 000 tokenów</li>
+          <li class="no">Cold start: minuty na pobranie i załadowanie wag</li>
+          <li class="no">Agresywny scale-down — kasuje ciepły KV-cache</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-title good">Co działa</div>
+        <ul class="list-plain">
+          <li class="ok">Skalowanie po <strong>długości kolejki</strong> i zajętości KV-cache (KEDA)</li>
+          <li class="ok">SLO na <strong>TTFT</strong> (pierwszy token) i <strong>TPOT</strong> (kolejne tokeny)</li>
+          <li class="ok">Ciepła rezerwa podów + preloading wag w obrazie lub na wolumenie</li>
+          <li class="ok">Routing sticky per sesja — trafia w gorący prefix cache</li>
+          <li class="ok">Osobne pule: interaktywne (niska latencja) vs batch (przepustowość)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="principle" style="margin-top:26px; padding:22px; max-width:1000px;">
+      <p style="font-size:15px;">
+        Inferencja LLM to workload <strong>stanowy w praktyce</strong>: KV-cache czyni z „bezstanowego" poda coś,
+        co ma pamięć i historię. Traktowanie go jak zwykłego kontenera HTTP to najczęstsza
+        przyczyna złych ogonów latencji i przepalonego budżetu GPU.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ 18: K8S — KOSZTY ═══ -->
+  <div class="slide">
+    <div class="kicker">Kubernetes · 5/5</div>
+    <h2>Dźwignie kosztowe własnej inferencji</h2>
+    <table class="compare dense" style="max-width:1050px">
+      <tr><th>Dźwignia</th><th>Mechanizm</th><th>Kiedy stosować</th><th>Koszt uboczny</th></tr>
+      <tr><td class="label">Continuous batching</td><td>Silnik dokłada requesty do trwającego batcha</td><td>Zawsze — domyślne w vLLM</td><td>Brak (rośnie ogon latencji przy skrajnym obciążeniu)</td></tr>
+      <tr><td class="label">Prefix / KV cache</td><td>Współdzielony prompt liczony raz</td><td>Stały system prompt, RAG, agenci</td><td>Wymaga routingu świadomego cache</td></tr>
+      <tr><td class="label">Kwantyzacja (FP8/INT8)</td><td>Mniej pamięci i szybsze mnożenia</td><td>Gdy nie mieścisz się w VRAM</td><td>Drobna utrata jakości — trzeba zmierzyć</td></tr>
+      <tr><td class="label">Prefill/decode split</td><td>llm-d: osobne pule na obie fazy</td><td>Duże modele, wysoki ruch</td><td>Złożoność operacyjna</td></tr>
+      <tr><td class="label">Routing per zadanie</td><td>Mały model do prostych ścieżek</td><td>Prawie zawsze</td><td>Dwa modele do utrzymania i ewaluacji</td></tr>
+      <tr><td class="label">Spot / preemptible</td><td>Tańsze GPU dla zadań przerywalnych</td><td>Batch, ewaluacje, indeksowanie</td><td>Nie dla ruchu interaktywnego</td></tr>
+    </table>
+    <p class="note">Jednostką rozliczeniową nie jest request ani token — jest <strong>koszt ukończonego zadania</strong>. Tańszy model, który potrzebuje trzech prób, nie jest tańszy.</p>
+  </div>
+
+  <!-- ═══ 19: PORÓWNANIE LLM ═══ -->
+  <div class="slide">
+    <div class="kicker">Modele · 1/3</div>
+    <h2>Krajobraz modeli — sierpień 2026</h2>
+    <table class="compare dense" style="max-width:1150px">
+      <tr><th>Rodzina</th><th>Mocna strona</th><th>Kontekst</th><th>Cena in/out (1M tok.)</th><th>Typowe zastosowanie</th></tr>
+      <tr>
+        <td class="label">Claude Opus 5</td>
+        <td>Kodowanie, długie zadania agentowe</td><td>1M</td><td>$5 / $25</td>
+        <td>Agenci w repo, trudny refaktor, review</td>
+      </tr>
+      <tr>
+        <td class="label">Claude Sonnet 5</td>
+        <td>Bilans jakość/koszt</td><td>1M</td><td>$2 / $10</td>
+        <td>Domyślny model produkcyjny w pipeline</td>
+      </tr>
+      <tr>
+        <td class="label">Claude Haiku 4.5</td>
+        <td>Szybkość, wolumen</td><td>200K</td><td>$1 / $5</td>
+        <td>Klasyfikacja, triage, subagenci</td>
+      </tr>
+      <tr>
+        <td class="label">GPT-5.x (OpenAI)</td>
+        <td>Szerokie narzędzia, ekosystem</td><td>duży</td><td>wg cennika</td>
+        <td>Aplikacje produktowe, multimodal</td>
+      </tr>
+      <tr>
+        <td class="label">Gemini 3.x (Google)</td>
+        <td>Bardzo długi kontekst, integracja z GCP</td><td>do ~2M</td><td>wg cennika</td>
+        <td>Analiza wielkich korpusów, wideo/obraz</td>
+      </tr>
+      <tr>
+        <td class="label">Open-source<br>(Llama, Qwen, DeepSeek, Mistral)</td>
+        <td>Kontrola, cena za token, self-hosting</td><td>zależnie od modelu</td><td>koszt GPU</td>
+        <td>Dane wrażliwe, wolumen, edge, fine-tuning</td>
+      </tr>
+    </table>
+    <p class="note">Ceny Claude — cennik Anthropic (pierwsza strona); pozostałe rodziny <strong>zawsze weryfikuj w aktualnym cenniku dostawcy</strong>: stawki, warianty i limity zmieniają się co kilka tygodni. Benchmarki (np. SWE-bench) traktuj jako sygnał kierunkowy, nie ranking do decyzji.</p>
+  </div>
+
+  <!-- ═══ 20: WYBÓR MODELU ═══ -->
+  <div class="slide">
+    <div class="kicker">Modele · 2/3</div>
+    <h2>Framework wyboru modelu</h2>
+    <div class="dtree">
+      <div class="dtree-row"><div class="dtree-q">Zadanie agentowe, długie, wieloetapowe?</div><div class="dtree-arrow">→</div><div class="dtree-a blue">Model klasy flagowej, wysoki effort</div></div>
+      <div class="dtree-row"><div class="dtree-q">Codzienna ścieżka produkcyjna, duży wolumen?</div><div class="dtree-arrow">→</div><div class="dtree-a green">Model średni + prompt caching</div></div>
+      <div class="dtree-row"><div class="dtree-q">Klasyfikacja, ekstrakcja, routing?</div><div class="dtree-arrow">→</div><div class="dtree-a amber">Najmniejszy model, który przechodzi ewaluację</div></div>
+      <div class="dtree-row"><div class="dtree-q">Dane nie mogą wyjść z organizacji?</div><div class="dtree-arrow">→</div><div class="dtree-a purple">Open-source na własnym K8s</div></div>
+      <div class="dtree-row"><div class="dtree-q">Nie wiesz, bo nie masz ewaluacji?</div><div class="dtree-arrow">→</div><div class="dtree-a slate">Zbuduj zestaw 30–50 realnych przypadków. Najpierw.</div></div>
+    </div>
+    <p class="note">Kolejność optymalizacji: <strong>najpierw darmowe wygrane</strong> (caching, higiena promptu, mniej narzędzi), <strong>potem</strong> obniżanie „effortu", <strong>na końcu</strong> zmiana modelu na tańszy. Odwrotna kolejność kosztuje jakość bez oszczędności.</p>
+  </div>
+
+  <!-- ═══ 21: ARCHITEKTURA REFERENCYJNA ═══ -->
+  <div class="slide">
+    <div class="kicker">Modele · 3/3</div>
+    <h2>Jak to się spina w jedną całość</h2>
+    <div class="stack" style="max-width:1050px">
+      <div class="layer"><span class="lbl">Developer · IDE</span><span class="dsc">Copilot completions + agent mode. Kontekst z <code>AGENTS.md</code>, szybkie testy jako pętla zwrotna.</span></div>
+      <div class="layer"><span class="lbl">Repozytorium</span><span class="dsc">Konwencje, custom agents, definicje workflow. Jedno źródło prawdy dla ludzi i agentów.</span></div>
+      <div class="layer hi"><span class="lbl">CI/CD · GitHub Actions</span><span class="dsc">Agent na PR (review, testy, triage buildów) — minimalne uprawnienia, brak sekretów, akcje pinowane do SHA.</span></div>
+      <div class="layer hi"><span class="lbl">Warstwa modeli</span><span class="dsc">Routing per zadanie: flagowy do agentów, średni do produkcji, mały do klasyfikacji. Jeden punkt wejścia i jeden budżet.</span></div>
+      <div class="layer"><span class="lbl">Kubernetes</span><span class="dsc">Tam, gdzie dane lub koszt tego wymagają: vLLM + Inference Gateway + DRA. Reszta ruchu na API dostawcy.</span></div>
+      <div class="layer"><span class="lbl">Obserwowalność i kontrola</span><span class="dsc">Koszt per zespół i per pipeline, ewaluacje na zestawie regresyjnym, audyt uruchomień agentów, DORA jako miara efektu.</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ 22: WNIOSKI ═══ -->
+  <div class="slide">
+    <div class="kicker">Podsumowanie</div>
+    <h2>Sześć rzeczy do zabrania ze sobą</h2>
+    <div class="takeaways">
+      <div class="takeaway"><div class="num">01</div><div class="text"><strong>Kontekst bije model.</strong> <code>AGENTS.md</code>, szybkie testy i czyste konwencje dają większy skok jakości niż zmiana dostawcy.</div></div>
+      <div class="takeaway"><div class="num">02</div><div class="text"><strong>Agent proponuje, człowiek zatwierdza.</strong> Automatyczny merge lub deploy sterowany przez model to ryzyko bez pokrycia w korzyści.</div></div>
+      <div class="takeaway"><div class="num">03</div><div class="text"><strong>Prompt injection w CI jest realny.</strong> Minimalne uprawnienia, brak sekretów przy agencie, akcje pinowane do SHA — to higiena bazowa, nie hardening dla paranoików.</div></div>
+      <div class="takeaway"><div class="num">04</div><div class="text"><strong>Review jest nowym wąskim gardłem.</strong> Skoro generowanie kodu przestało być kosztowne, planuj przepustowość weryfikacji.</div></div>
+      <div class="takeaway"><div class="num">05</div><div class="text"><strong>K8s do inferencji dojrzał — ale nie dla każdego.</strong> DRA, vLLM i Inference Gateway są gotowe; uzasadnia je compliance albo stały wolumen, nie sama chęć oszczędzania.</div></div>
+      <div class="takeaway"><div class="num">06</div><div class="text"><strong>Mierz koszt ukończonego zadania.</strong> Nie tokeny, nie linie kodu, nie acceptance rate — DORA plus rework plus rachunek za modele.</div></div>
+    </div>
+  </div>
+
+  <!-- ═══ 23: ŹRÓDŁA ═══ -->
+  <div class="slide">
+    <div class="kicker">Materiały</div>
+    <h2>Źródła i dalsza lektura</h2>
+    <div class="sources" style="max-width:900px">
+      <div class="source-item"><span class="src-icon">🐙</span><span><strong>GitHub Blog</strong> — Agent HQ, rozliczenie oparte na AI Credits, coding agent<br><a href="https://github.blog/">github.blog</a></span></div>
+      <div class="source-item"><span class="src-icon">📘</span><span><strong>GitHub Docs</strong> — Copilot coding agent, custom agents, agentic workflows<br><a href="https://docs.github.com/copilot">docs.github.com/copilot</a></span></div>
+      <div class="source-item"><span class="src-icon">🛡️</span><span><strong>Cloud Security Alliance / Microsoft Security</strong> — prompt injection w akcjach AI, „Comment and Control", PromptPwnd (2026)</span></div>
+      <div class="source-item"><span class="src-icon">☸️</span><span><strong>Kubernetes</strong> — Gateway API Inference Extension, DRA (GA w 1.34)<br><a href="https://kubernetes.io/blog/">kubernetes.io/blog</a></span></div>
+      <div class="source-item"><span class="src-icon">⚡</span><span><strong>vLLM / llm-d</strong> — continuous batching, prefix caching, prefill/decode disaggregation<br><a href="https://docs.vllm.ai/">docs.vllm.ai</a></span></div>
+      <div class="source-item"><span class="src-icon">🧠</span><span><strong>Cenniki dostawców</strong> — Anthropic, OpenAI, Google. Weryfikuj przed każdą decyzją budżetową.</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ 24: FINAŁ ═══ -->
+  <div class="slide">
+    <div class="final">
+      <div class="kicker">Dziękuję</div>
+      <h2 style="margin-bottom:8px;">Pytania?</h2>
+      <p class="big-quote">
+        Narzędzia AI nie zastępują inżynierii.<br>
+        Podnoszą cenę <em>złej</em> inżynierii<br>i skracają drogę do dobrej.
+      </p>
+      <div class="author" style="margin-top:32px;">
+        <strong>Monika Sadlok</strong> · Softkraft · 2026
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- NAV -->
+<div class="nav">
+  <button onclick="prev()">← Wstecz</button>
+  <span class="counter" id="counter">1 / 24</span>
+  <button onclick="next()">Dalej →</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let cur = 0;
+
+  function show(n) {
+    slides[cur].classList.remove('active');
+    slides[cur].classList.add('exit');
+    setTimeout(() => slides[cur >= 0 ? cur : 0].classList.remove('exit'), 500);
+    cur = (n + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('slideNum').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+  }
+
+  function next() {
+    const n = (cur + 1) % slides.length;
+    slides[cur].classList.remove('active');
+    slides[cur].style.opacity = 0;
+    slides[cur].style.transform = 'translateX(-60px)';
+    setTimeout(() => {
+      slides[cur].style.opacity = '';
+      slides[cur].style.transform = '';
+      cur = n;
+      slides[cur].classList.add('active');
+      update();
+    }, 300);
+  }
+
+  function prev() {
+    const n = (cur - 1 + slides.length) % slides.length;
+    slides[cur].classList.remove('active');
+    slides[cur].style.opacity = 0;
+    slides[cur].style.transform = 'translateX(60px)';
+    setTimeout(() => {
+      slides[cur].style.opacity = '';
+      slides[cur].style.transform = '';
+      cur = n;
+      slides[cur].classList.add('active');
+      update();
+    }, 300);
+  }
+
+  function update() {
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('slideNum').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                    { e.preventDefault(); prev(); }
+  });
+
+  update();
+</script>
+</body>
+</html>

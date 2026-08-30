@@ -1,8 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=rag-is-dead/presentation.html">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prezentacje</title>
+<style>
+  :root { --accent:#288cbb; --text:#0f0f0f; --dim:#64748b; --border:rgba(40,140,187,.18); }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:#f7f9fb; color:var(--text); min-height:100vh;
+    display:flex; align-items:center; justify-content:center; padding:40px;
+    background-image:
+      linear-gradient(rgba(40,140,187,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40,140,187,.07) 1px, transparent 1px);
+    background-size:48px 48px;
+  }
+  .wrap { max-width:720px; width:100%; }
+  .kicker { font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:12px; }
+  h1 { font-size:34px; font-weight:800; margin-bottom:28px; }
+  a.deck {
+    display:block; text-decoration:none; color:inherit;
+    background:#fff; border:1px solid var(--border); border-radius:16px;
+    padding:24px 28px; margin-bottom:16px;
+    box-shadow:0 2px 16px rgba(40,140,187,.08);
+    transition:transform .2s, border-color .2s, box-shadow .2s;
+  }
+  a.deck:hover { transform:translateY(-3px); border-color:var(--accent); box-shadow:0 8px 28px rgba(40,140,187,.15); }
+  a.deck h2 { font-size:19px; font-weight:700; margin-bottom:6px; color:var(--accent); }
+  a.deck p { font-size:14px; color:var(--dim); line-height:1.55; }
+  .foot { margin-top:24px; font-size:13px; color:var(--dim); }
+</style>
 </head>
-<body></body>
+<body>
+<div class="wrap">
+  <div class="kicker">Softkraft</div>
+  <h1>Prezentacje</h1>
+
+  <a class="deck" href="rag-is-dead/presentation.html">
+    <h2>Fundamentals of Intelligent Search &amp; Answer Generation</h2>
+    <p>Beyond Naive RAG → reprezentacja wiedzy → Context Engineering. Wraz z demami interaktywnymi.</p>
+  </a>
+
+  <a class="deck" href="ai-devops/presentation.html">
+    <h2>AI w cyklu wytwarzania oprogramowania</h2>
+    <p>GitHub Copilot → CI/CD z agentami → Kubernetes dla inferencji → porównanie i wybór modeli LLM.</p>
+  </a>
+
+  <p class="foot">Demonstracje do pierwszej prezentacji: demo.html … demo5.html</p>
+</div>
+</body>
 </html>
