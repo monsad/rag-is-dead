@@ -1,0 +1,69 @@
+# Open WebUI wskazane na serwer inferencji z modelami OpenVINO.
+#
+#   export INFER_KEY="sk-infer-..."
+#   docker compose up -d
+#   otwórz http://localhost:3000
+#
+# Wszystkie ustawienia poniżej działają TYLKO przy pierwszym starcie —
+# potem Open WebUI trzyma konfigurację w swojej bazie. Szczegóły w README.
+
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui:/app/backend/data
+    environment:
+      # ─── modele do rozmowy ───
+      OPENAI_API_BASE_URL: ${INFER_URL:-https://biuro.cdest.eu:11437/v1}
+      OPENAI_API_KEY: ${INFER_KEY:?ustaw INFER_KEY przed uruchomieniem}
+
+      # ─── embeddingi: e5 z serwera zamiast domyślnego modelu Open WebUI ───
+      # Bez tego dokumenty byłyby wektoryzowane lokalnym modelem kontenera,
+      # a serwer OpenVINO w ogóle nie brałby udziału w wyszukiwaniu.
+      RAG_EMBEDDING_ENGINE: openai
+      RAG_OPENAI_API_BASE_URL: ${INFER_URL:-https://biuro.cdest.eu:11437/v1}
+      RAG_OPENAI_API_KEY: ${INFER_KEY}
+      RAG_EMBEDDING_MODEL: ${INFER_EMBED:-multilingual-e5-large-int8}
+
+      # E5 rozróżnia pytanie od dokumentu po przedrostku. Pominięcie tego
+      # nie wywoła błędu — po prostu pogorszy wyniki, po cichu.
+      RAG_EMBEDDING_QUERY_PREFIX: "query: "
+      RAG_EMBEDDING_CONTENT_PREFIX: "passage: "
+
+      # ─── reranker: ms-marco z serwera ───
+      # URL musi być pełną ścieżką do /rerank (tak go składa ExternalReranker).
+      RAG_RERANKING_ENGINE: external
+      RAG_EXTERNAL_RERANKER_URL: ${INFER_URL:-https://biuro.cdest.eu:11437/v1}/rerank
+      RAG_EXTERNAL_RERANKER_API_KEY: ${INFER_KEY}
+      RAG_RERANKING_MODEL: ${INFER_RERANK:-ms-marco-MiniLM-L6-v2-int8-ov}
+
+      # ─── jak szuka ───
+      # Wektory + BM25, potem reranker zawęża 20 kandydatów do 5.
+      # Ten sam układ co w ../asystent — najpierw zasięg, potem precyzja.
+      ENABLE_RAG_HYBRID_SEARCH: "true"
+      RAG_HYBRID_BM25_WEIGHT: "0.5"
+      RAG_TOP_K: "20"
+      RAG_TOP_K_RERANKER: "5"
+
+      # ─── głos ───
+      AUDIO_STT_ENGINE: openai
+      AUDIO_STT_OPENAI_API_BASE_URL: ${INFER_URL:-https://biuro.cdest.eu:11437/v1}
+      AUDIO_STT_OPENAI_API_KEY: ${INFER_KEY}
+      AUDIO_STT_MODEL: ${INFER_ASR:-whisper-large-v3-int8-ov}
+
+      AUDIO_TTS_ENGINE: openai
+      AUDIO_TTS_OPENAI_API_BASE_URL: ${INFER_URL:-https://biuro.cdest.eu:11437/v1}
+      AUDIO_TTS_OPENAI_API_KEY: ${INFER_KEY}
+      AUDIO_TTS_MODEL: ${INFER_TTS:-speecht5-tts-ov}
+
+      # ─── zdrowy rozsądek ───
+      # Pierwsze konto założone w interfejsie zostaje administratorem.
+      ENABLE_SIGNUP: "false"
+      WEBUI_NAME: "Asystent OpenVINO"
+
+volumes:
+  open-webui:
