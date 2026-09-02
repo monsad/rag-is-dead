@@ -1,0 +1,5 @@
+index.json
+*.wav
+pytanie.*
+__pycache__/
+*.pyc
